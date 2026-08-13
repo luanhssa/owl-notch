@@ -27,12 +27,12 @@ into SwiftUI or model code.
 Every piece of standalone behavior — `GitInfoService`, `SessionTitleService`,
 `SidebarTitleService`, `SessionFocusService`, `ProcessAncestry` — is an
 `enum` with only `static` members. No instances, no protocols, no DI
-container. `SidebarTitleService` and `GitInfoService` are the two exceptions,
-each with a lock-guarded static cache (keyed by session id and by `cwd`
-respectively) to avoid re-scanning the filesystem on every hook event. If
-you add a third cached service, guard its state with a lock too — don't
-rely on "every caller happens to already be on the main actor," which is how
-issue #11 happened.
+container. `SidebarTitleService`, `GitInfoService`, and `SessionTitleService` are the
+exceptions, each with a lock-guarded static cache (keyed by session id, by
+`cwd`, and by `transcriptPath` respectively) to avoid re-scanning the
+filesystem on every hook event. If you add another cached service, guard
+its state with a lock too — don't rely on "every caller happens to already
+be on the main actor," which is how issue #11 happened.
 
 ## 3. Doc comments explain WHY, and say what's confirmed vs. assumed
 

@@ -10,6 +10,17 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-13
+
+### Fixed
+
+- `SessionTitleService` re-read and re-parsed up to 4MB of transcript on
+  every hook event for any session whose title never resolved (noise-only
+  first prompt, or one that fell past the scan window) — results (including
+  "no title found") are now cached per `transcriptPath`, which is exact
+  rather than a trade-off: a transcript's first message never changes as
+  the conversation grows ([#4](https://github.com/luanhssa/owl-notch/issues/4)).
+
 ## [0.1.3] - 2026-08-13
 
 ### Fixed

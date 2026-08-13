@@ -11,11 +11,37 @@ enum SessionTitleService {
     /// images/attachments in early turns can otherwise make a single line huge.
     private static let maxBytesRead = 4 * 1024 * 1024
 
+    /// Keyed by `transcriptPath`. Unlike a git branch, the first user
+    /// message never changes as a transcript grows — new turns only ever
+    /// get appended after it — so caching a miss here (no title found in
+    /// the scanned window) is exact, not a trade-off: it can never become
+    /// stale. Without this, a session whose first real prompt is noise-only
+    /// or falls past the scan window re-reads and re-parses up to 4MB of
+    /// transcript on every single hook event for its whole lifetime (GH
+    /// issue #4).
+    private static let lock = NSLock()
+    private static var cache: [String: String?] = [:]
+
     static func deriveTitle(transcriptPath: String?) -> String? {
-        guard
-            let transcriptPath,
-            let handle = FileHandle(forReadingAtPath: transcriptPath)
-        else { return nil }
+        guard let transcriptPath else { return nil }
+
+        lock.lock()
+        if let cached = cache[transcriptPath] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let result = resolveTitle(transcriptPath: transcriptPath)
+
+        lock.lock()
+        cache[transcriptPath] = result
+        lock.unlock()
+        return result
+    }
+
+    private static func resolveTitle(transcriptPath: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: transcriptPath) else { return nil }
         defer { handle.closeFile() }
 
         let data = handle.readData(ofLength: maxBytesRead)
