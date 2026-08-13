@@ -1,0 +1,134 @@
+import AppKit
+import SwiftUI
+import Combine
+import ServiceManagement
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let sessionStore = SessionStore()
+    private var ipcServer: IPCServer!
+    private var panel: NSPanel!
+    private var cancellables = Set<AnyCancellable>()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
+        setupPanel()
+        observeStore()
+        registerLoginItemIfNeeded()
+
+        ipcServer = IPCServer(store: sessionStore)
+        ipcServer.start()
+    }
+
+    /// Only meaningful once Owl runs from a real .app bundle (see
+    /// Scripts/build-app-bundle.sh) — SMAppService needs a proper bundle
+    /// identifier. Running the bare SwiftPM binary during development is a
+    /// harmless no-op here.
+    private func registerLoginItemIfNeeded() {
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
+        let service = SMAppService.mainApp
+        guard service.status != .enabled else { return }
+        do {
+            try service.register()
+        } catch {
+            NSLog("Owl: login item registration failed (status was \(service.status.rawValue)): \(error)")
+        }
+    }
+
+    private func setupPanel() {
+        guard let screen = NSScreen.main else { return }
+        let frame = frameForPanel(on: screen)
+
+        panel = NSPanel(
+            contentRect: frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.level = .statusBar
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        panel.isMovableByWindowBackground = false
+
+        let hosting = NSHostingView(rootView: NotchContentView(store: sessionStore))
+        hosting.frame = NSRect(origin: .zero, size: frame.size)
+        panel.contentView = hosting
+
+        panel.orderFrontRegardless()
+    }
+
+    /// Real notch dimensions from the safe-area/auxiliary-area APIs — the
+    /// collapsed pill matches this exactly so it reads as an extension of the
+    /// physical notch rather than a separate floating capsule. Falls back to
+    /// a plain top-center pill size on displays with no notch (external
+    /// monitors, older Intel Macs).
+    private func notchGeometry(on screen: NSScreen) -> (width: CGFloat, height: CGFloat) {
+        let notchHeight = screen.safeAreaInsets.top
+        if notchHeight > 0,
+           let leftAux = screen.auxiliaryTopLeftArea,
+           let rightAux = screen.auxiliaryTopRightArea {
+            return (rightAux.minX - leftAux.maxX, notchHeight)
+        }
+        return (180, 34)
+    }
+
+    private func frameForPanel(on screen: NSScreen) -> NSRect {
+        let (notchWidth, notchHeight) = notchGeometry(on: screen)
+        sessionStore.notchWidth = notchWidth
+        let expanded = sessionStore.isExpanded || sessionStore.needsAttentionCount > 0
+
+        let width = expanded ? NotchLayout.expandedWidth : notchWidth
+        var height = notchHeight
+        if expanded {
+            height += expandedContentHeight()
+        }
+
+        let x = screen.frame.midX - width / 2
+        let y = screen.frame.maxY - height
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
+    private func expandedContentHeight() -> CGFloat {
+        let sessions = sessionStore.sortedSessions
+        guard !sessions.isEmpty else { return 40 }
+
+        var content: CGFloat = 0
+        for session in sessions {
+            content += NotchLayout.collapsedRowHeight
+            if sessionStore.expandedSessionID == session.sessionID {
+                content += NotchLayout.accordionDetailExtraHeight
+            }
+        }
+        return min(content, NotchLayout.expandedListMaxHeight)
+    }
+
+    private func observeStore() {
+        Publishers.CombineLatest3(sessionStore.$isExpanded, sessionStore.$sessions, sessionStore.$expandedSessionID)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _, _, _ in
+                self?.resizePanel()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func resizePanel() {
+        guard let screen = NSScreen.main else { return }
+        let newFrame = frameForPanel(on: screen)
+        panel.setFrame(newFrame, display: true, animate: true)
+        panel.contentView?.frame = NSRect(origin: .zero, size: newFrame.size)
+    }
+}
+
+@main
+struct OwlMain {
+    @MainActor
+    static func main() {
+        let delegate = AppDelegate()
+        let app = NSApplication.shared
+        app.delegate = delegate
+        app.run()
+    }
+}
