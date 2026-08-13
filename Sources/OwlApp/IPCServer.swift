@@ -124,17 +124,18 @@ final class IPCServer {
     /// park a `DispatchQueue.global()` worker thread (GH issue #7).
     private static let readTimeoutSeconds: Int = 2
 
+    /// Generous ceiling for a single hook payload — guards against a
+    /// client that never closes its write side from growing
+    /// `readFullMessage`'s buffer unboundedly.
+    private static let maxEnvelopeBytes = 1024 * 1024
+
     private func handleConnection(_ clientFd: Int32) {
         defer { close(clientFd) }
 
         var timeout = timeval(tv_sec: Self.readTimeoutSeconds, tv_usec: 0)
         setsockopt(clientFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
-        var buffer = [UInt8](repeating: 0, count: 65536)
-        let bytesRead = read(clientFd, &buffer, buffer.count)
-        guard bytesRead > 0 else { return }
-
-        let data = Data(buffer[0..<bytesRead])
+        guard let data = Self.readFullMessage(from: clientFd), !data.isEmpty else { return }
         guard let envelope = HookEnvelope(data: data) else { return }
 
         let response = "{\"status\":\"ok\"}\n"
@@ -145,5 +146,25 @@ final class IPCServer {
         Task { @MainActor in
             self.store.handle(envelope: envelope)
         }
+    }
+
+    /// Unix stream sockets have no built-in message framing, so a single
+    /// `read()` isn't guaranteed to return a whole envelope (GH issue #8).
+    /// owl-hook always writes its complete payload and then closes its side
+    /// of the connection immediately (see its own `main.swift`), so reading
+    /// until EOF — rather than assuming one `read()` call is the whole
+    /// message — reassembles a fragmented payload correctly. The read
+    /// timeout set in `handleConnection` still bounds how long this can
+    /// take for a client that never closes.
+    private static func readFullMessage(from fd: Int32) -> Data? {
+        var accumulated = Data()
+        var chunk = [UInt8](repeating: 0, count: 65536)
+
+        while accumulated.count < maxEnvelopeBytes {
+            let bytesRead = read(fd, &chunk, chunk.count)
+            guard bytesRead > 0 else { break } // 0 = EOF (expected); negative = error/timeout
+            accumulated.append(chunk, count: bytesRead)
+        }
+        return accumulated
     }
 }

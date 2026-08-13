@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-13
+
+### Fixed
+
+- `IPCServer` assumed a hook envelope always arrived in a single `read()`
+  call — a payload fragmented across multiple reads was silently dropped.
+  Connections are now read in a loop until the peer closes its side (EOF),
+  which is how owl-hook always terminates a write, bounded by a 1MB ceiling
+  and the existing read timeout ([#8](https://github.com/luanhssa/owl-notch/issues/8)).
+
 ## [0.1.7] - 2026-08-13
 
 ### Fixed
