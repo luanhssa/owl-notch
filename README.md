@@ -110,6 +110,18 @@ open Owl.app
 Logs and the unix socket live under
 `~/Library/Application Support/Owl/` (`owl.log`, `owl.sock`).
 
+## Contributing
+
+Found a bug or have an idea? Open an issue — the [issue
+template](.github/ISSUE_TEMPLATE/bug_or_improvement.md) walks you through
+Owl's reporting format (description, repro steps, expected vs. actual,
+supporting assets, environment). Existing reports:
+[bugs](https://github.com/luanhssa/owl-notch/issues?q=is%3Aissue+label%3Abug) ·
+[enhancements](https://github.com/luanhssa/owl-notch/issues?q=is%3Aissue+label%3Aenhancement).
+
+The conventions the code already follows are written up in
+[docs/PATTERNS.md](docs/PATTERNS.md) — worth a skim before sending a PR.
+
 ## Uninstall
 
 ```bash
