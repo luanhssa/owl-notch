@@ -261,7 +261,18 @@ final class SessionStore: ObservableObject {
         info.state = newState
         if stateChanged {
             info.stateEnteredAt = Date()
-            if newState.isNotable { info.acknowledged = false }
+        }
+        // A repeat "notification" hook is a fresh signal that Claude is
+        // blocked on the user again, even when it maps to the same
+        // SessionState as before (e.g. two permission prompts in a row with
+        // no intervening userpromptsubmit) — so it un-acknowledges too, not
+        // just an actual state transition (GH issue #5). Other event types
+        // that merely preserve the current notable state via the `default`
+        // case above (e.g. a stray PreToolUse after `.done`) must NOT do
+        // this, or "Abrir sessão" would never stick for those.
+        let isFreshNotification = envelope.eventType == "notification"
+        if newState.isNotable && (stateChanged || isFreshNotification) {
+            info.acknowledged = false
         }
         info.lastEventAt = Date()
         info.lastToolName = input.toolName ?? info.lastToolName

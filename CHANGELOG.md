@@ -10,6 +10,18 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-13
+
+### Fixed
+
+- A session's `acknowledged` flag could permanently suppress a still-pending
+  notification: it only reset on an actual `SessionState` transition, so a
+  repeat `"notification"` hook for an already-acknowledged session (e.g. two
+  permission prompts in a row with no intervening `userpromptsubmit`) never
+  re-flagged it. A fresh `"notification"` event now un-acknowledges the
+  session even when it maps to the same state as before
+  ([#5](https://github.com/luanhssa/owl-notch/issues/5)).
+
 ## [0.1.4] - 2026-08-13
 
 ### Fixed
