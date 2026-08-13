@@ -10,6 +10,17 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-13
+
+### Fixed
+
+- `GitInfoService` re-walked the filesystem for branch info on every hook
+  event for any session outside a git repo — results (including "no repo
+  found") are now cached per `cwd` instead of recomputed every time
+  ([#3](https://github.com/luanhssa/owl-notch/issues/3)). The main-actor
+  blocking / no-timeout half of that issue is tracked separately under the
+  "Move filesystem-heavy lookups off the main actor" enhancement.
+
 ## [0.1.2] - 2026-08-13
 
 ### Fixed
