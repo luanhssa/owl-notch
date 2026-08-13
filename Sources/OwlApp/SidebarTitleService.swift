@@ -16,8 +16,16 @@ enum SidebarTitleService {
         let lastActivityAt: Double
     }
 
+    /// Guards `cache`/`lastScanAt`/`isScanning` — every current caller
+    /// happens to run on the main actor, but that was only ever an
+    /// unenforced convention (see GH issue #11), and the background scan
+    /// this file now kicks off is by construction NOT on the main actor. A
+    /// plain lock is enough here; there's no async work happening while
+    /// held, just dictionary/Date reads and writes.
+    private static let lock = NSLock()
     private static var cache: [String: Entry] = [:]
     private static var lastScanAt = Date.distantPast
+    private static var isScanning = false
     /// Throttles re-scans so a burst of hook events (several tool calls in a
     /// row) doesn't re-read every session file on disk for each one.
     private static let scanInterval: TimeInterval = 2
@@ -29,7 +37,9 @@ enum SidebarTitleService {
     }
 
     static func title(forCliSessionID cliSessionID: String) -> String? {
-        rescanIfNeeded()
+        kickOffRescanIfNeeded()
+        lock.lock()
+        defer { lock.unlock() }
         guard let title = cache[cliSessionID]?.title, !title.isEmpty else { return nil }
         return title
     }
@@ -38,15 +48,38 @@ enum SidebarTitleService {
     /// CLI session (the `local_<uuid>` filename stem, minus the prefix) —
     /// see SessionFocusService for why this is useful.
     static func internalSessionID(forCliSessionID cliSessionID: String) -> String? {
-        rescanIfNeeded()
+        kickOffRescanIfNeeded()
+        lock.lock()
+        defer { lock.unlock() }
         return cache[cliSessionID]?.internalSessionID
     }
 
-    private static func rescanIfNeeded() {
+    /// Serves whatever is already cached immediately, and — if the throttle
+    /// window has elapsed and no scan is already in flight — kicks off the
+    /// actual tree walk on a background queue instead of running it inline.
+    /// Every caller into this file runs on the main actor (`SessionStore`,
+    /// SwiftUI button actions), and the walk-and-parse in `scan()` can be
+    /// slow with a large Claude Desktop history (GH issue #1); this trades
+    /// "always current" for "never blocks," refreshing the cache
+    /// asynchronously instead.
+    private static func kickOffRescanIfNeeded() {
+        lock.lock()
         let now = Date()
-        guard now.timeIntervalSince(lastScanAt) >= scanInterval else { return }
+        guard !isScanning, now.timeIntervalSince(lastScanAt) >= scanInterval else {
+            lock.unlock()
+            return
+        }
+        isScanning = true
         lastScanAt = now
-        cache = scan()
+        lock.unlock()
+
+        DispatchQueue.global(qos: .utility).async {
+            let result = scan()
+            lock.lock()
+            cache = result
+            isScanning = false
+            lock.unlock()
+        }
     }
 
     private static func scan() -> [String: Entry] {
