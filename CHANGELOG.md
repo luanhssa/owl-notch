@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-13
+
+### Fixed
+
+- `IPCServer`'s per-connection `read()` had no timeout — a client that
+  connected and never wrote could park a `DispatchQueue.global()` worker
+  thread indefinitely, and enough stalled connections could exhaust the
+  pool. Accepted connections now set a 2s `SO_RCVTIMEO`
+  ([#7](https://github.com/luanhssa/owl-notch/issues/7)).
+
 ## [0.1.6] - 2026-08-13
 
 ### Fixed

@@ -117,8 +117,18 @@ final class IPCServer {
         }
     }
 
+    /// A legitimate owl-hook client writes its whole payload immediately
+    /// after connecting (see its own ~250ms connect budget) — this just
+    /// needs to be generous enough not to cut off a slow write under load,
+    /// while still bounding how long a stalled/malicious connection can
+    /// park a `DispatchQueue.global()` worker thread (GH issue #7).
+    private static let readTimeoutSeconds: Int = 2
+
     private func handleConnection(_ clientFd: Int32) {
         defer { close(clientFd) }
+
+        var timeout = timeval(tv_sec: Self.readTimeoutSeconds, tv_usec: 0)
+        setsockopt(clientFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
         var buffer = [UInt8](repeating: 0, count: 65536)
         let bytesRead = read(clientFd, &buffer, buffer.count)
