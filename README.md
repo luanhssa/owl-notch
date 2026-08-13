@@ -122,6 +122,11 @@ supporting assets, environment). Existing reports:
 The conventions the code already follows are written up in
 [docs/PATTERNS.md](docs/PATTERNS.md) — worth a skim before sending a PR.
 
+## Versioning
+
+Owl follows [Semantic Versioning](https://semver.org/). See
+[CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Uninstall
 
 ```bash
