@@ -49,7 +49,12 @@ enum GitInfoService {
     }
 
     private static func findGitDir(startingAt path: String) -> URL? {
-        var dir = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        // `.resolvingSymlinksInPath()`, not just `.standardizedFileURL` —
+        // the latter only normalizes `.`/`..` lexically, so a symlinked cwd
+        // (e.g. a symlink into a repo elsewhere) would walk the symlink's
+        // own literal ancestry and never find the real repo's `.git`
+        // (GH issue #9).
+        var dir = URL(fileURLWithPath: path, isDirectory: true).resolvingSymlinksInPath()
         let fm = FileManager.default
 
         for _ in 0..<20 { // bounded walk up, in case cwd is deeply nested with no repo

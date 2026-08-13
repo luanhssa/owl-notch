@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-13
+
+### Fixed
+
+- `GitInfoService` never resolved symlinks when walking up for `.git` —
+  only `.standardizedFileURL`'s lexical `.`/`..` normalization was applied,
+  so a symlinked working directory could never find the real repo. Now
+  uses `.resolvingSymlinksInPath()`
+  ([#9](https://github.com/luanhssa/owl-notch/issues/9)).
+
 ## [0.1.8] - 2026-08-13
 
 ### Fixed
