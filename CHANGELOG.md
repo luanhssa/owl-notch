@@ -10,6 +10,19 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-13
+
+### Fixed
+
+- `IPCServer`'s accept loop had no error handling, so a repeatedly-failing
+  `accept()` (e.g. hitting the process's file descriptor limit) would
+  busy-spin a CPU core forever with no logging. Failures now log via
+  `NSLog` and back off exponentially (capped at 1s)
+  ([#6](https://github.com/luanhssa/owl-notch/issues/6)).
+- Added `IPCServer.stop()` — there was previously no way to shut the socket
+  server down cleanly; it's now called from `applicationWillTerminate`
+  ([#6](https://github.com/luanhssa/owl-notch/issues/6)).
+
 ## [0.1.5] - 2026-08-13
 
 ### Fixed

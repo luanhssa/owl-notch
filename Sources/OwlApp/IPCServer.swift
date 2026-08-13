@@ -12,6 +12,11 @@ final class IPCServer {
     private let store: SessionStore
     private var serverFd: Int32 = -1
 
+    /// Guards `serverFd`/`stopped` — `stop()` can be called from the main
+    /// thread while `acceptLoop` reads them on its own background thread.
+    private let lifecycleLock = NSLock()
+    private var stopped = false
+
     init(store: SessionStore) {
         self.store = store
     }
@@ -67,14 +72,48 @@ final class IPCServer {
         }
     }
 
+    /// Closes the listening socket and signals `acceptLoop` to exit instead
+    /// of retrying — closing the fd out from under a blocked `accept()` call
+    /// makes it return immediately with an error, which is the loop's cue
+    /// that this shutdown was intentional (see `acceptLoop`).
+    func stop() {
+        lifecycleLock.lock()
+        guard !stopped else { lifecycleLock.unlock(); return }
+        stopped = true
+        let fd = serverFd
+        serverFd = -1
+        lifecycleLock.unlock()
+
+        if fd >= 0 { close(fd) }
+    }
+
     private func acceptLoop(serverFd: Int32) {
+        var consecutiveFailures = 0
         while true {
             let clientFd = accept(serverFd, nil, nil)
-            guard clientFd >= 0 else { continue }
-
-            DispatchQueue.global().async { [weak self] in
-                self?.handleConnection(clientFd)
+            if clientFd >= 0 {
+                consecutiveFailures = 0
+                DispatchQueue.global().async { [weak self] in
+                    self?.handleConnection(clientFd)
+                }
+                continue
             }
+
+            let failureErrno = errno
+
+            lifecycleLock.lock()
+            let weStopped = stopped
+            lifecycleLock.unlock()
+            // stop() closed this fd itself — that's the intentional-shutdown
+            // signal, not a real failure worth logging or retrying.
+            if weStopped { break }
+
+            consecutiveFailures += 1
+            NSLog("Owl: accept() failed (errno \(failureErrno)), retry #\(consecutiveFailures)")
+            // Exponential backoff capped at 1s — without this, a persistent
+            // failure (e.g. too many open files) busy-spins a CPU core.
+            let delaySeconds = min(pow(2, Double(consecutiveFailures)) * 0.01, 1.0)
+            Thread.sleep(forTimeInterval: delaySeconds)
         }
     }
 

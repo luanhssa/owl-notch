@@ -21,6 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ipcServer.start()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        ipcServer.stop()
+    }
+
     /// Only meaningful once Owl runs from a real .app bundle (see
     /// Scripts/build-app-bundle.sh) — SMAppService needs a proper bundle
     /// identifier. Running the bare SwiftPM binary during development is a
