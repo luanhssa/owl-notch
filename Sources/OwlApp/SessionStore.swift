@@ -85,6 +85,13 @@ final class SessionStore: ObservableObject {
 
     private var pruneTimer: Timer?
 
+    /// How long a burst of state changes (`PreToolUse` fires on every tool
+    /// call) is allowed to coalesce before it's actually written to disk —
+    /// short enough that a crash/relaunch loses at most a moment of state,
+    /// long enough that a busy session doesn't hit the disk on every event.
+    private static let persistDebounceInterval: TimeInterval = 1.5
+    private var persistTimer: Timer?
+
     private static var persistenceURL: URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -96,6 +103,11 @@ final class SessionStore: ObservableObject {
         pruneTimer = Timer.scheduledTimer(withTimeInterval: Self.pruneInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pruneStaleSessions() }
         }
+    }
+
+    deinit {
+        pruneTimer?.invalidate()
+        persistTimer?.invalidate()
     }
 
     private func loadPersistedSessions() {
@@ -110,15 +122,32 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    /// Coalesces a burst of state changes into a single disk write once
+    /// things settle, instead of encoding and writing synchronously on every
+    /// single hook event — replaces every direct call to `persistSessions()`.
+    private func schedulePersist() {
+        persistTimer?.invalidate()
+        persistTimer = Timer.scheduledTimer(withTimeInterval: Self.persistDebounceInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.persistSessions() }
+        }
+    }
+
     private func persistSessions() {
         let cutoff = Date().addingTimeInterval(-Self.staleAfter)
         let toSave = sessions.values.filter { $0.lastEventAt > cutoff }
-        guard let data = try? JSONEncoder().encode(Array(toSave)) else { return }
-        try? FileManager.default.createDirectory(
-            at: Self.persistenceURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try? data.write(to: Self.persistenceURL, options: .atomic)
+        guard let data = try? JSONEncoder().encode(Array(toSave)) else {
+            NSLog("Owl: failed to encode sessions for persistence")
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(
+                at: Self.persistenceURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: Self.persistenceURL, options: .atomic)
+        } catch {
+            NSLog("Owl: failed to persist sessions to \(Self.persistenceURL.path): \(error)")
+        }
     }
 
     /// Removes sessions with no new event in `staleAfter` from the live list,
@@ -129,7 +158,7 @@ final class SessionStore: ObservableObject {
         let staleIDs = sessions.filter { $0.value.lastEventAt <= cutoff }.map(\.key)
         guard !staleIDs.isEmpty else { return }
         for id in staleIDs { sessions.removeValue(forKey: id) }
-        persistSessions()
+        schedulePersist()
     }
 
     func toggleExpanded() {
@@ -152,7 +181,7 @@ final class SessionStore: ObservableObject {
             updated.acknowledged = true
             sessions[sessionID] = updated
         }
-        persistSessions()
+        schedulePersist()
     }
 
     /// Called from the notch's close (X) button — dismisses everything at
@@ -167,7 +196,7 @@ final class SessionStore: ObservableObject {
             sessions[id]?.acknowledged = true
         }
         isExpanded = false
-        persistSessions()
+        schedulePersist()
     }
 
     var sortedSessions: [SessionInfo] {
@@ -251,7 +280,7 @@ final class SessionStore: ObservableObject {
         }
 
         sessions[sessionID] = info
-        persistSessions()
+        schedulePersist()
     }
 
     private static func projectName(fromCwd cwd: String) -> String {

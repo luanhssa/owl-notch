@@ -10,6 +10,19 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-13
+
+### Fixed
+
+- `SessionStore` wrote the full session state to disk synchronously on
+  every single hook event — writes are now debounced (1.5s) so a burst of
+  events coalesces into one write once things settle, and encode/write
+  failures now log via `NSLog` instead of failing silently
+  ([#2](https://github.com/luanhssa/owl-notch/issues/2)).
+- `SessionStore`'s prune timer was never invalidated on deallocation — added
+  a `deinit` that invalidates both the prune and persist timers
+  ([#22](https://github.com/luanhssa/owl-notch/issues/22)).
+
 ## [0.1.1] - 2026-08-13
 
 ### Fixed
