@@ -94,17 +94,42 @@ enum SidebarTitleService {
         for case let url as URL in enumerator {
             let filename = url.deletingPathExtension().lastPathComponent
             guard url.pathExtension == "json", filename.hasPrefix("local_") else { continue }
-            guard
-                let data = try? Data(contentsOf: url),
-                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                let cliSessionID = json["cliSessionId"] as? String,
-                json["isArchived"] as? Bool != true
-            else { continue }
+
+            // Each guard below distinguishes a genuine parsing/schema
+            // failure (worth logging — it means Claude Desktop's on-disk
+            // format may have changed, GH issue #12) from the deliberate,
+            // expected "isArchived" skip right after, which is not a
+            // failure and must stay silent.
+            guard let data = try? Data(contentsOf: url) else {
+                NSLog("Owl: couldn't read Claude Desktop session record at \(url.path)")
+                continue
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                NSLog("Owl: couldn't parse Claude Desktop session record as JSON at \(url.path)")
+                continue
+            }
+            guard let cliSessionID = json["cliSessionId"] as? String else {
+                NSLog("Owl: Claude Desktop session record at \(url.path) has no string cliSessionId — its format may have changed")
+                continue
+            }
+            guard json["isArchived"] as? Bool != true else { continue }
+
+            let lastActivityAt: Double
+            if let value = json["lastActivityAt"] as? Double {
+                lastActivityAt = value
+            } else if json["lastActivityAt"] != nil {
+                // Present but not a Double — a real format change, unlike a
+                // freshly created record that just doesn't have this key yet.
+                NSLog("Owl: Claude Desktop session record at \(url.path) has a non-numeric lastActivityAt — its format may have changed")
+                lastActivityAt = 0
+            } else {
+                lastActivityAt = 0
+            }
 
             let candidate = Entry(
                 title: json["title"] as? String,
                 internalSessionID: String(filename.dropFirst("local_".count)),
-                lastActivityAt: json["lastActivityAt"] as? Double ?? 0
+                lastActivityAt: lastActivityAt
             )
             if let existing = bestByCliID[cliSessionID], !isBetter(candidate, than: existing) {
                 continue

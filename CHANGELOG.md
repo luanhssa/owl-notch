@@ -10,6 +10,17 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-08-13
+
+### Fixed
+
+- `SidebarTitleService` silently swallowed any schema mismatch in Claude
+  Desktop's on-disk session records (renamed/missing `cliSessionId`, a
+  non-numeric `lastActivityAt`) with zero logging. Genuine parsing/schema
+  failures now log via `NSLog`, kept separate from the deliberate, silent
+  `isArchived` skip so that expected filtering doesn't get logged as a
+  problem ([#12](https://github.com/luanhssa/owl-notch/issues/12)).
+
 ## [0.1.10] - 2026-08-13
 
 ### Fixed
