@@ -10,6 +10,18 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-08-13
+
+### Fixed
+
+- `owl-hook` called `ProcessAncestry.classify()` only after its socket
+  connect/poll dance, which alone can take up to `connectTimeoutMs` (250ms).
+  If the hook-invoking parent process exited during that window, owl-hook
+  would already be reparented to `launchd` by the time `classify()` ran,
+  misclassifying a real `"cli"`/`"code"` session as `"unknown"`. Moved the
+  call to the very start of the process, before reading stdin or touching
+  the socket at all ([#14](https://github.com/luanhssa/owl-notch/issues/14)).
+
 ## [0.1.12] - 2026-08-13
 
 ### Fixed

@@ -20,6 +20,16 @@ func exitAllow() -> Never {
     exit(0)
 }
 
+// Capture ancestry as the very first thing this process does, before
+// reading stdin or touching the socket at all. classify() walks parent
+// PIDs starting from getppid() — if the hook-invoking parent has already
+// exited by the time this runs, owl-hook will have been reparented to
+// launchd and getppid() returns 1, misclassifying a real "cli"/"code"
+// session as "unknown". Running this first minimizes that window instead
+// of doing it after the whole connect/poll dance, which alone can take up
+// to connectTimeoutMs (GH issue #14).
+let ancestry = ProcessAncestry.classify()
+
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 
 let socketPath = FileManager.default
@@ -86,7 +96,6 @@ var envelope: [String: Any] = [
     "hook_input": hookInput,
 ]
 
-let ancestry = ProcessAncestry.classify()
 envelope["environment"] = ancestry.environment
 if let terminalApp = ancestry.terminalApp {
     envelope["terminal_app"] = terminalApp
