@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-08-13
+
+### Fixed
+
+- `IPCServer` silently truncated the socket path via `strncpy` if it ever
+  exceeded `sockaddr_un.sun_path`'s 104-byte buffer (an unusually long home
+  directory path), which would bind to a different, wrong path with zero
+  indication. Now checks the length first and logs via `NSLog` instead of
+  proceeding ([#16](https://github.com/luanhssa/owl-notch/issues/16)).
+
 ## [0.1.14] - 2026-08-13
 
 ### Fixed

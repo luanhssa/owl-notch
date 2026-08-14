@@ -41,6 +41,15 @@ final class IPCServer {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
+        // strncpy below silently truncates anything over sunPathSize - 1
+        // bytes (1 reserved for the null terminator) — check first instead
+        // of letting bind() quietly succeed on a shorter, wrong path that
+        // owl-hook's independently-constructed path would never match
+        // (GH issue #16).
+        guard socketPath.utf8.count < sunPathSize else {
+            NSLog("Owl: socket path too long for sockaddr_un (\(socketPath.utf8.count) bytes, max \(sunPathSize - 1)): \(socketPath)")
+            return
+        }
         _ = withUnsafeMutablePointer(to: &addr.sun_path) { rawPtr in
             rawPtr.withMemoryRebound(to: CChar.self, capacity: sunPathSize) { ptr in
                 socketPath.withCString { cstr in
