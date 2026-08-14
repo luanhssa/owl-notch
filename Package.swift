@@ -5,8 +5,9 @@ let package = Package(
     name: "Owl",
     platforms: [.macOS(.v13)],
     targets: [
+        .target(name: "OwlShared", path: "Sources/OwlShared"),
         .executableTarget(name: "OwlServer", path: "Sources/OwlServer"),
-        .executableTarget(name: "owl-hook", path: "Sources/owl-hook"),
-        .executableTarget(name: "OwlApp", path: "Sources/OwlApp"),
+        .executableTarget(name: "owl-hook", dependencies: ["OwlShared"], path: "Sources/owl-hook"),
+        .executableTarget(name: "OwlApp", dependencies: ["OwlShared"], path: "Sources/OwlApp"),
     ]
 )

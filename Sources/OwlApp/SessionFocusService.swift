@@ -1,4 +1,5 @@
 import AppKit
+import OwlShared
 
 /// "Jump to session" (the deep-link arrow).
 ///
@@ -51,9 +52,6 @@ enum SessionFocusService {
     }
 
     private static func bundleIdentifier(forTerminalApp appName: String) -> String {
-        switch appName {
-        case "iTerm2", "iTerm": return "com.googlecode.iterm2"
-        default: return "com.apple.Terminal"
-        }
+        TerminalAppRegistry.bundleIdentifier(forProcessName: appName) ?? "com.apple.Terminal"
     }
 }

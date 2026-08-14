@@ -1,4 +1,5 @@
 import Foundation
+import OwlShared
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -13,7 +14,7 @@ enum ProcessAncestry {
         let terminalApp: String? // only meaningful when environment == "cli"
     }
 
-    private static let terminalProcessNames: Set<String> = ["Terminal", "iTerm2", "iTerm"]
+    private static let terminalProcessNames = TerminalAppRegistry.processNames
     private static let claudeDesktopProcessNames: Set<String> = ["Claude"]
 
     static func classify() -> Info {

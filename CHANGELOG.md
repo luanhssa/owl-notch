@@ -10,6 +10,23 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-08-13
+
+### Fixed
+
+- `ProcessAncestry` (owl-hook) and `SessionFocusService` (OwlApp) each had
+  their own hardcoded, hand-synced list of terminal apps, which had already
+  drifted from each other. Extracted a new `OwlShared` target with a single
+  `TerminalAppRegistry` both now depend on and import
+  ([#13](https://github.com/luanhssa/owl-notch/issues/13)). Terminal
+  coverage is unchanged (Terminal/iTerm2/iTerm) — expanding it further is
+  tracked separately.
+
+### Added
+
+- A new `OwlShared` library target for data more than one target needs, so
+  it doesn't get copy-pasted per target again.
+
 ## [0.1.11] - 2026-08-13
 
 ### Fixed

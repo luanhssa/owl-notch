@@ -115,11 +115,13 @@ style choice, not a signal that a retain cycle was ever found; keep doing it
 in new escaping closures rather than reasoning case-by-case about whether
 it's "really" needed.
 
-## 13. Anti-pattern to avoid: duplicated hardcoded lists across targets
+## 13. Shared cross-target data lives in `OwlShared`, not in a hardcoded copy per target
 
-`ProcessAncestry.terminalProcessNames` (in the `owl-hook` target) and
-`SessionFocusService.bundleIdentifier(forTerminalApp:)` (in the `OwlApp`
-target) are two independently hardcoded, hand-synced lists of the same
-terminal apps. Don't add a third copy anywhere else — this is a known,
-tracked gap (see the terminal-allowlist enhancement issue), not a pattern to
-replicate.
+`ProcessAncestry` (in the `owl-hook` target) and `SessionFocusService` (in
+the `OwlApp` target) both need the same terminal-app table — which app's
+process name maps to which bundle identifier. It used to be two
+independently hardcoded, hand-synced lists that had already drifted (GH
+issue #13); it's now `TerminalAppRegistry` in the `OwlShared` target, which
+both targets depend on and import. If another piece of data ever needs to
+be known by more than one target, add it to `OwlShared` rather than copying
+it — that's the whole reason the target exists.
