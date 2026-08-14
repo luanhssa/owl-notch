@@ -9,8 +9,8 @@ private func color(for state: SessionState) -> Color {
     }
 }
 
-private func elapsedLabel(since date: Date) -> String {
-    let seconds = max(0, Int(Date().timeIntervalSince(date)))
+private func elapsedLabel(since date: Date, now: Date) -> String {
+    let seconds = max(0, Int(now.timeIntervalSince(date)))
     if seconds < 60 { return "\(seconds)s" }
     let minutes = seconds / 60
     if minutes < 60 { return "\(minutes)m" }
@@ -101,11 +101,17 @@ struct SessionRowView: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("há \(elapsedLabel(since: session.stateEnteredAt)) nesse estado")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.white.opacity(0.5))
-                        Spacer()
+                    // Without TimelineView, this label only recomputes when
+                    // some unrelated @Published change on `store` happens to
+                    // trigger a re-render — it can go stale indefinitely
+                    // while nothing else changes (GH issue #17).
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        HStack {
+                            Text("há \(elapsedLabel(since: session.stateEnteredAt, now: context.date)) nesse estado")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.5))
+                            Spacer()
+                        }
                     }
                     if let summary = session.lastToolSummary {
                         Text(summary)

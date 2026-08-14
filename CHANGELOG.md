@@ -10,6 +10,17 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-08-13
+
+### Fixed
+
+- The "há Xm nesse estado" elapsed-time label in a session's expanded detail
+  only recomputed when an unrelated `@Published` change happened to
+  re-render the view, so it could go stale indefinitely while nothing else
+  changed. Wrapped it in a `TimelineView(.periodic(from: .now, by: 1))` so
+  it now ticks on its own every second while visible
+  ([#17](https://github.com/luanhssa/owl-notch/issues/17)).
+
 ## [0.1.15] - 2026-08-13
 
 ### Fixed
