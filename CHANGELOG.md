@@ -10,6 +10,18 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-08-13
+
+### Fixed
+
+- `fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]` was
+  copy-pasted in five places across all three targets, with no shared
+  helper documenting why the force-index is safe. Added
+  `OwlPaths.applicationSupportDirectory` to `OwlShared` and pointed every
+  call site at it instead ([#15](https://github.com/luanhssa/owl-notch/issues/15)).
+  Verified both debug and release builds, and `owl-hook`, still work
+  end-to-end.
+
 ## [0.1.13] - 2026-08-13
 
 ### Fixed

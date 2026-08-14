@@ -1,4 +1,5 @@
 import Foundation
+import OwlShared
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -12,8 +13,7 @@ signal(SIGPIPE, SIG_IGN)
 // MARK: - Paths
 
 let fm = FileManager.default
-let supportDir = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    .appendingPathComponent("Owl")
+let supportDir = OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl")
 try? fm.createDirectory(at: supportDir, withIntermediateDirectories: true)
 
 let socketPath = supportDir.appendingPathComponent("owl.sock").path

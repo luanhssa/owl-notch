@@ -1,4 +1,5 @@
 import Foundation
+import OwlShared
 
 enum SessionState: String, Codable {
     case running
@@ -93,9 +94,7 @@ final class SessionStore: ObservableObject {
     private var persistTimer: Timer?
 
     private static var persistenceURL: URL {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Owl/sessions.json")
+        OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json")
     }
 
     init() {

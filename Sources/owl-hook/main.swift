@@ -1,4 +1,5 @@
 import Foundation
+import OwlShared
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -32,8 +33,7 @@ let ancestry = ProcessAncestry.classify()
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 
-let socketPath = FileManager.default
-    .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+let socketPath = OwlPaths.applicationSupportDirectory
     .appendingPathComponent("Owl/owl.sock")
     .path
 

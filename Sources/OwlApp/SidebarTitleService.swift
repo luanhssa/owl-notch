@@ -1,4 +1,5 @@
 import Foundation
+import OwlShared
 
 /// Reads what Claude Desktop already knows about a CLI session from its own
 /// local records. Desktop persists one JSON file per Desktop-side
@@ -31,9 +32,7 @@ enum SidebarTitleService {
     private static let scanInterval: TimeInterval = 2
 
     private static var sessionsRoot: URL {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Claude/claude-code-sessions")
+        OwlPaths.applicationSupportDirectory.appendingPathComponent("Claude/claude-code-sessions")
     }
 
     static func title(forCliSessionID cliSessionID: String) -> String? {
