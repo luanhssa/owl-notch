@@ -10,6 +10,17 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-08-13
+
+### Fixed
+
+- `SessionFocusService` interpolated the session id into the `claude://`
+  deep link with no percent-encoding — a value containing a reserved
+  character (space, `&`, `=`, `#`, `+`) would make `URL(string:)` return
+  `nil` and silently no-op. Now percent-encodes it first, with `&`/`=`/`+`
+  also excluded from the allowed set since the id is a single query value,
+  not a query string of its own ([#20](https://github.com/luanhssa/owl-notch/issues/20)).
+
 ## [0.1.18] - 2026-08-13
 
 ### Fixed

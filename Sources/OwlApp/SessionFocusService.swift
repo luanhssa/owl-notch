@@ -28,7 +28,14 @@ enum SessionFocusService {
         switch session.environment {
         case .code:
             let target = SidebarTitleService.internalSessionID(forCliSessionID: session.sessionID) ?? session.sessionID
-            guard let url = URL(string: "claude://resume?session=\(target)") else { return }
+            // Both id sources are UUID-shaped today, but percent-encode
+            // defensively rather than relying on that — an unescaped
+            // reserved character here would make URL(string:) return nil
+            // and silently no-op (GH issue #20).
+            guard
+                let encodedTarget = target.addingPercentEncoding(withAllowedCharacters: Self.queryValueAllowedCharacters),
+                let url = URL(string: "claude://resume?session=\(encodedTarget)")
+            else { return }
             NSWorkspace.shared.open(url)
         case .cowork:
             activate(bundleIdentifier: claudeDesktopBundleID, fallbackAppName: "Claude")
@@ -53,5 +60,15 @@ enum SessionFocusService {
 
     private static func bundleIdentifier(forTerminalApp appName: String) -> String {
         TerminalAppRegistry.bundleIdentifier(forProcessName: appName) ?? "com.apple.Terminal"
+    }
+
+    /// `.urlQueryAllowed` alone permits `&`/`=`/`+`, which are fine in a
+    /// full query string but would let a single query *value* inject an
+    /// extra parameter or corrupt the one it's part of — remove them here
+    /// since `target` is a value, not a query string of its own.
+    private static var queryValueAllowedCharacters: CharacterSet {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+")
+        return allowed
     }
 }
