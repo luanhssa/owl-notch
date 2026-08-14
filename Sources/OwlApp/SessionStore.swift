@@ -79,6 +79,13 @@ final class SessionStore: ObservableObject {
     /// went quiet half a day ago has no "click to jump back" value left.
     private static let staleAfter: TimeInterval = 12 * 60 * 60
 
+    /// Independent of the time-based prune above, which by definition can't
+    /// remove anything less than `staleAfter` old — this bounds worst-case
+    /// memory/disk growth from a burst of many distinct session ids within
+    /// that window (a misbehaving client, or an unusually high-volume day),
+    /// which time alone can't catch (GH issue #23).
+    private static let maxTrackedSessions = 200
+
     /// Catches sessions that go stale without ever generating another hook
     /// event to trigger an inline prune (e.g. the last session in the list
     /// finishes and nothing more ever arrives).
@@ -119,6 +126,22 @@ final class SessionStore: ObservableObject {
         for info in decoded where info.lastEventAt > cutoff {
             sessions[info.sessionID] = info
         }
+        enforceSessionCap()
+    }
+
+    /// Evicts the least-recently-active sessions first once over
+    /// `maxTrackedSessions` — the only two places `sessions` can grow are
+    /// here at startup (loading a persisted file from before this cap
+    /// existed, or from an unusually long-running instance) and in
+    /// `handle(envelope:)`.
+    private func enforceSessionCap() {
+        let overflow = sessions.count - Self.maxTrackedSessions
+        guard overflow > 0 else { return }
+        let oldestIDs = sessions.values
+            .sorted { $0.lastEventAt < $1.lastEventAt }
+            .prefix(overflow)
+            .map(\.sessionID)
+        for id in oldestIDs { sessions.removeValue(forKey: id) }
     }
 
     /// Coalesces a burst of state changes into a single disk write once
@@ -290,6 +313,7 @@ final class SessionStore: ObservableObject {
         }
 
         sessions[sessionID] = info
+        enforceSessionCap()
         schedulePersist()
     }
 

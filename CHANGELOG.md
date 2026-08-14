@@ -10,6 +10,18 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-08-13
+
+### Fixed
+
+- `sessions` (and its persisted mirror) was only bounded by the 12-hour
+  `staleAfter` time window, which by definition can't catch a burst of many
+  distinct session ids within that window. Added an independent
+  `maxTrackedSessions` (200) hard cap, evicting the least-recently-active
+  sessions first when exceeded, enforced both at startup (loading a
+  persisted file) and in `handle(envelope:)`
+  ([#23](https://github.com/luanhssa/owl-notch/issues/23)).
+
 ## [0.1.20] - 2026-08-13
 
 ### Fixed
