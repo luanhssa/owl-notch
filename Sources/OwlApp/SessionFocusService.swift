@@ -35,8 +35,13 @@ enum SessionFocusService {
             guard
                 let encodedTarget = target.addingPercentEncoding(withAllowedCharacters: Self.queryValueAllowedCharacters),
                 let url = URL(string: "claude://resume?session=\(encodedTarget)")
-            else { return }
-            NSWorkspace.shared.open(url)
+            else {
+                reportFailure("couldn't build a claude:// URL for session \(session.sessionID)")
+                return
+            }
+            if !NSWorkspace.shared.open(url) {
+                reportFailure("NSWorkspace couldn't open \(url.absoluteString) — is Claude Desktop installed?")
+            }
         case .cowork:
             activate(bundleIdentifier: claudeDesktopBundleID, fallbackAppName: "Claude")
         case .cli, .unknown:
@@ -49,17 +54,32 @@ enum SessionFocusService {
         let workspace = NSWorkspace.shared
 
         guard let url = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            _ = workspace.launchApplication(fallbackAppName)
+            if !workspace.launchApplication(fallbackAppName) {
+                reportFailure("couldn't find or launch \(fallbackAppName)")
+            }
             return
         }
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        workspace.openApplication(at: url, configuration: configuration)
+        workspace.openApplication(at: url, configuration: configuration) { _, error in
+            if let error {
+                reportFailure("couldn't open \(fallbackAppName): \(error.localizedDescription)")
+            }
+        }
     }
 
     private static func bundleIdentifier(forTerminalApp appName: String) -> String {
         TerminalAppRegistry.bundleIdentifier(forProcessName: appName) ?? "com.apple.Terminal"
+    }
+
+    /// Every "jump to session" failure path used to be a completely silent
+    /// no-op — a system beep plus a log line is a minimal, honest signal
+    /// that something didn't work, short of building a full in-panel
+    /// message (GH issue #21).
+    private static func reportFailure(_ message: String) {
+        NSLog("Owl: \"jump to session\" failed — \(message)")
+        NSSound.beep()
     }
 
     /// `.urlQueryAllowed` alone permits `&`/`=`/`+`, which are fine in a

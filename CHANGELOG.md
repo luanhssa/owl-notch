@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-08-13
+
+### Fixed
+
+- Every "jump to session" failure path (bad URL, Claude Desktop not
+  installed, app-open failure) was a silent no-op — none of
+  `NSWorkspace`'s return values or completion handlers were inspected. Now
+  logs via `NSLog` and plays a system beep on failure, a minimal but honest
+  signal instead of doing nothing ([#21](https://github.com/luanhssa/owl-notch/issues/21)).
+
 ## [0.1.19] - 2026-08-13
 
 ### Fixed
