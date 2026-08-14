@@ -64,11 +64,17 @@ enum GitInfoService {
                 if isDirectory.boolValue {
                     return gitPath
                 }
-                // Worktrees: .git is a file containing "gitdir: <path>".
+                // Worktrees: .git is a file containing "gitdir: <path>". Git
+                // itself always writes an absolute path here, but resolve
+                // relative to the .git file's own directory rather than
+                // Owl's process cwd in case that ever isn't true — matches
+                // git's own semantics and costs nothing for the absolute
+                // case, since relativeTo is ignored once the path resolves
+                // to an absolute one anyway (GH issue #10).
                 if let pointer = try? String(contentsOf: gitPath, encoding: .utf8),
                    let range = pointer.range(of: "gitdir: ") {
                     let target = pointer[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-                    return URL(fileURLWithPath: target, isDirectory: true)
+                    return URL(fileURLWithPath: target, isDirectory: true, relativeTo: gitPath.deletingLastPathComponent())
                 }
             }
             let parent = dir.deletingLastPathComponent()

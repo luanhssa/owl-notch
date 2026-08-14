@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-08-13
+
+### Fixed
+
+- `GitInfoService` resolved a worktree's relative `gitdir:` pointer against
+  Owl's own process cwd instead of the `.git` file's directory. Now resolves
+  relative to the `.git` file itself, matching git's own semantics — the
+  common absolute-path case is unaffected
+  ([#10](https://github.com/luanhssa/owl-notch/issues/10)).
+
 ## [0.1.9] - 2026-08-13
 
 ### Fixed
