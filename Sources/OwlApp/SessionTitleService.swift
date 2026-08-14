@@ -87,8 +87,22 @@ enum SessionTitleService {
     private static func isRealUserText(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        let noisyPrefixes = ["<task-notification>", "<system-reminder>", "<user-prompt-submit-hook>"]
-        return !noisyPrefixes.contains { trimmed.hasPrefix($0) }
+        return !isSyntheticWrapperTag(trimmed)
+    }
+
+    /// Recognizes a harness-injected wrapper tag (`<task-notification>`,
+    /// `<system-reminder>`, `<user-prompt-submit-hook>`, ...) by shape —
+    /// a bare, attribute-less kebab-case tag right at the start of the
+    /// text — rather than an exact list of known names, which drifts out
+    /// of date as Claude Code adds more of these over time (GH issue #19).
+    /// Requiring a hyphen specifically targets that multi-word-kebab-case
+    /// shape so this doesn't misfire on ordinary text that happens to start
+    /// with "<" (e.g. "<3", "<html>", a pasted code snippet).
+    private static func isSyntheticWrapperTag(_ trimmed: String) -> Bool {
+        guard trimmed.hasPrefix("<"), let closeIndex = trimmed.firstIndex(of: ">") else { return false }
+        let inner = trimmed[trimmed.index(after: trimmed.startIndex)..<closeIndex]
+        guard inner.contains("-") else { return false }
+        return inner.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" }
     }
 
     private static func truncate(_ text: String) -> String {

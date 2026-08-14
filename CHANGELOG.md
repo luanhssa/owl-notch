@@ -10,6 +10,20 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-08-13
+
+### Fixed
+
+- `SessionTitleService` filtered harness-injected noise via a small,
+  hand-maintained exact-string list (`<task-notification>`,
+  `<system-reminder>`, `<user-prompt-submit-hook>`) that would drift out of
+  date as Claude Code adds more of these. Replaced it with a shape-based
+  heuristic — a bare, attribute-less kebab-case tag at the start of the
+  text — that generalizes to future tags following the same convention,
+  verified against both the known tags and plausible real text that starts
+  with `<` (`<3`, `<html>`, pasted HTML) to confirm it doesn't misfire
+  ([#19](https://github.com/luanhssa/owl-notch/issues/19)).
+
 ## [0.1.17] - 2026-08-13
 
 ### Fixed
