@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-08-13
+
+### Fixed
+
+- `NotchContentView.body` accessed `store.sortedSessions` three separate
+  times per render (empty check, `ForEach`, and a last-element divider
+  check re-sorting once per iteration) — `sortedSessions` re-sorts on every
+  access. Captured it once into a local `let` and reused it
+  ([#18](https://github.com/luanhssa/owl-notch/issues/18)).
+
 ## [0.1.16] - 2026-08-13
 
 ### Fixed

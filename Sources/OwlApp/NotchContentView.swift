@@ -190,7 +190,14 @@ struct NotchContentView: View {
             if effectiveExpanded {
                 Divider().background(Color.white.opacity(0.1))
 
-                if store.sortedSessions.isEmpty {
+                // Captured once instead of accessed repeatedly below —
+                // `sortedSessions` re-sorts on every access (GH issue #18),
+                // so re-reading `store.sortedSessions` for the empty check,
+                // the ForEach, and the last-element divider check would be
+                // three (effectively more, for the divider) redundant sorts
+                // of the same data per render.
+                let sessions = store.sortedSessions
+                if sessions.isEmpty {
                     Text("Nenhuma sessão ainda")
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.5))
@@ -198,14 +205,14 @@ struct NotchContentView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
-                            ForEach(store.sortedSessions) { session in
+                            ForEach(sessions) { session in
                                 SessionRowView(
                                     store: store,
                                     session: session,
                                     isExpanded: store.expandedSessionID == session.sessionID,
                                     onToggle: { store.toggleAccordion(sessionID: session.sessionID) }
                                 )
-                                if session.id != store.sortedSessions.last?.id {
+                                if session.id != sessions.last?.id {
                                     Divider().background(Color.white.opacity(0.06))
                                 }
                             }
