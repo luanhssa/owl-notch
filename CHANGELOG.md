@@ -10,6 +10,21 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-13
+
+### Added
+
+- `TerminalAppRegistry` now covers VS Code, Alacritty, kitty, WezTerm,
+  Ghostty, and Warp in addition to Terminal/iTerm2/iTerm — CLI sessions
+  running in any of these now classify correctly instead of falling back to
+  `"unknown"`, and "jump to session" focuses the right app instead of
+  defaulting to Terminal.app ([#28](https://github.com/luanhssa/owl-notch/issues/28)).
+  Process names/bundle identifiers were verified against each project's own
+  source/build files where possible (VS Code was checked directly against a
+  local install); Ghostty's and Warp's process names are good-faith
+  inferences, not independently confirmed against a running instance —
+  noted inline in the registry.
+
 ## [0.1.21] - 2026-08-13
 
 ### Fixed
