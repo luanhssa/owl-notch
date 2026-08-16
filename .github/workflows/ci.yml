@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build (${{ matrix.configuration }})
+    runs-on: macos-15
+    strategy:
+      matrix:
+        configuration: [debug, release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: swift build
+        run: swift build -c ${{ matrix.configuration }}
+
+      # No test target exists yet (see #38) — add `swift test` here once it lands.

@@ -10,6 +10,15 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-13
+
+### Added
+
+- CI via GitHub Actions (`.github/workflows/ci.yml`): runs `swift build` in
+  both debug and release on every push to `main` and every PR, on
+  `macos-15`. No test target exists yet (see #38) — a `swift test` step
+  will follow once one does ([#40](https://github.com/luanhssa/owl-notch/issues/40)).
+
 ## [0.2.0] - 2026-08-13
 
 ### Added
