@@ -10,6 +10,37 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-16
+
+### Added
+
+- A real test suite: 36 tests across two new targets (`OwlAppTests`,
+  `OwlHookTests`), covering `SessionStore.handle(envelope:)`'s state
+  machine (including the #5 and #23 regressions), `GitInfoService`'s HEAD/
+  worktree parsing (including the #9 and #10 regressions), `SessionTitleService`'s
+  title derivation (including the #19 regression), and `ProcessAncestry`'s
+  name-matching classification ([#38](https://github.com/luanhssa/owl-notch/issues/38)).
+  CI now runs `swift test` on every push/PR instead of just `swift build`.
+
+### Changed
+
+- `SessionStore.init` now takes an injectable `persistenceURL` (defaulting
+  to the real path, unchanged for production) so tests never touch a real
+  user's Owl data — see `docs/PATTERNS.md` #14.
+- `ProcessAncestry.classify()` is now split into a live sysctl-based walk
+  and a separate, pure `classify(ancestorProcessNames:)` matching function,
+  so the matching logic can be unit tested without mocking process
+  introspection — see `docs/PATTERNS.md` #15.
+
+### Fixed
+
+- While verifying this work, discovered that manually invoking `owl-hook`
+  against the real unix socket during development reaches the developer's
+  actual running Owl.app and pollutes its real session state — this
+  happened during this session and required quitting/cleaning/relaunching
+  the live app. Documented as a standing caution; the new test suite
+  exercises this logic without ever touching a real socket.
+
 ## [0.2.1] - 2026-08-13
 
 ### Added

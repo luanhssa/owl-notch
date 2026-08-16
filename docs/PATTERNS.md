@@ -125,3 +125,31 @@ issue #13); it's now `TerminalAppRegistry` in the `OwlShared` target, which
 both targets depend on and import. If another piece of data ever needs to
 be known by more than one target, add it to `OwlShared` rather than copying
 it — that's the whole reason the target exists.
+
+## 14. Testability seam: inject real-world paths via a defaulted init parameter
+
+`SessionStore` reads/writes a real file
+(`~/Library/Application Support/Owl/sessions.json`) from its `init()`. Tests
+can't safely call `SessionStore()` as-is — it would touch the developer's
+actual Owl data (this bit us once: see `Tests/OwlAppTests/SessionStoreTests.swift`'s
+history and the `feedback_owl_hook_live_socket` note about invoking
+`owl-hook` against a real running Owl.app during manual verification).
+The fix is `init(persistenceURL: URL = OwlPaths.applicationSupportDirectory...)`
+— production code gets the exact same default it always had, and tests pass
+a throwaway temp file instead. Follow the same pattern for any future state
+that touches a real, shared, or user-specific path: default parameter for
+production, explicit override for tests — not a global/static path baked
+into the type.
+
+## 15. Tests use fixtures, not mocks, for filesystem-backed services
+
+`GitInfoServiceTests` and `SessionTitleServiceTests` don't mock
+`FileManager` — they write real temporary files/directories (a fresh,
+UUID-named path per test, cleaned up in `tearDown`) and call the real
+service against them. Both services cache by path (see #2, #3), so reusing
+a fixed path across tests would leak a cached result from one test into
+another; a unique path per test sidesteps that entirely rather than
+resetting internal cache state from outside. `ProcessAncestry` is the
+exception — its live `sysctl`-based walk genuinely can't be exercised this
+way, so its name-matching logic was extracted into a pure, plain-array-in
+function (`classify(ancestorProcessNames:)`) instead.

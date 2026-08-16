@@ -7,16 +7,20 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    name: Build (${{ matrix.configuration }})
+  test:
+    name: Test (debug)
     runs-on: macos-15
-    strategy:
-      matrix:
-        configuration: [debug, release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: swift test
+        run: swift test
+
+  build-release:
+    name: Build (release)
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
       - name: swift build
-        run: swift build -c ${{ matrix.configuration }}
-
-      # No test target exists yet (see #38) — add `swift test` here once it lands.
+        run: swift build -c release

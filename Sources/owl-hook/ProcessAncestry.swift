@@ -18,22 +18,44 @@ enum ProcessAncestry {
     private static let claudeDesktopProcessNames: Set<String> = ["Claude"]
 
     static func classify() -> Info {
+        classify(ancestorProcessNames: walkAncestorProcessNames())
+    }
+
+    /// The actual name-matching logic, separated from the live sysctl-based
+    /// walk below so it can be unit tested with a plain array of names
+    /// instead of mocking process introspection (GH issue #38). Trade-off,
+    /// noted for anyone re-optimizing this later: the original inline
+    /// version returned as soon as a match was found partway up the walk;
+    /// this always walks the full bounded chain first. Both share the same
+    /// hard cap (`hops < 40` in `walkAncestorProcessNames`), so this is at
+    /// most the same small number of extra syscalls already budgeted for
+    /// the no-match case — not a meaningful cost given owl-hook's own
+    /// socket connect/poll dance dominates its runtime anyway.
+    static func classify(ancestorProcessNames: [String]) -> Info {
+        for name in ancestorProcessNames {
+            if terminalProcessNames.contains(name) {
+                return Info(environment: "cli", terminalApp: name)
+            }
+            if claudeDesktopProcessNames.contains(name) {
+                return Info(environment: "code", terminalApp: nil)
+            }
+        }
+        return Info(environment: "unknown", terminalApp: nil)
+    }
+
+    private static func walkAncestorProcessNames() -> [String] {
         var pid = getppid()
         var hops = 0
+        var names: [String] = []
         while pid > 1 && hops < 40 {
             if let name = processName(pid: pid) {
-                if terminalProcessNames.contains(name) {
-                    return Info(environment: "cli", terminalApp: name)
-                }
-                if claudeDesktopProcessNames.contains(name) {
-                    return Info(environment: "code", terminalApp: nil)
-                }
+                names.append(name)
             }
             guard let parent = parentPid(of: pid), parent != pid else { break }
             pid = parent
             hops += 1
         }
-        return Info(environment: "unknown", terminalApp: nil)
+        return names
     }
 
     private static func parentPid(of pid: pid_t) -> pid_t? {

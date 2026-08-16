@@ -100,11 +100,13 @@ final class SessionStore: ObservableObject {
     private static let persistDebounceInterval: TimeInterval = 1.5
     private var persistTimer: Timer?
 
-    private static var persistenceURL: URL {
-        OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json")
-    }
+    /// Injectable so tests can point it at a throwaway temp file instead of
+    /// the real `~/Library/Application Support/Owl/sessions.json` — the
+    /// default preserves production behavior exactly.
+    private let persistenceURL: URL
 
-    init() {
+    init(persistenceURL: URL = OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json")) {
+        self.persistenceURL = persistenceURL
         loadPersistedSessions()
         pruneTimer = Timer.scheduledTimer(withTimeInterval: Self.pruneInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pruneStaleSessions() }
@@ -118,7 +120,7 @@ final class SessionStore: ObservableObject {
 
     private func loadPersistedSessions() {
         guard
-            let data = try? Data(contentsOf: Self.persistenceURL),
+            let data = try? Data(contentsOf: persistenceURL),
             let decoded = try? JSONDecoder().decode([SessionInfo].self, from: data)
         else { return }
 
@@ -163,12 +165,12 @@ final class SessionStore: ObservableObject {
         }
         do {
             try FileManager.default.createDirectory(
-                at: Self.persistenceURL.deletingLastPathComponent(),
+                at: persistenceURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            try data.write(to: Self.persistenceURL, options: .atomic)
+            try data.write(to: persistenceURL, options: .atomic)
         } catch {
-            NSLog("Owl: failed to persist sessions to \(Self.persistenceURL.path): \(error)")
+            NSLog("Owl: failed to persist sessions to \(persistenceURL.path): \(error)")
         }
     }
 

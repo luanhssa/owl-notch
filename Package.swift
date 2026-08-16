@@ -9,5 +9,7 @@ let package = Package(
         .executableTarget(name: "OwlServer", dependencies: ["OwlShared"], path: "Sources/OwlServer"),
         .executableTarget(name: "owl-hook", dependencies: ["OwlShared"], path: "Sources/owl-hook"),
         .executableTarget(name: "OwlApp", dependencies: ["OwlShared"], path: "Sources/OwlApp"),
+        .testTarget(name: "OwlAppTests", dependencies: ["OwlApp"], path: "Tests/OwlAppTests"),
+        .testTarget(name: "OwlHookTests", dependencies: ["owl-hook", "OwlShared"], path: "Tests/OwlHookTests"),
     ]
 )
