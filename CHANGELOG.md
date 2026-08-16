@@ -10,6 +10,29 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-16
+
+### Added
+
+- Foreground-session suppression, phase 1 (user-requested): a session whose
+  own app (terminal, or Claude Desktop) is already the frontmost
+  application no longer counts toward `needsAttentionCount` or floats to
+  the top of `sortedSessions` — the user is already looking at it. Reverses
+  immediately if the user switches away, since it's a live comparison
+  against `NSWorkspace.frontmostApplication`, not a sticky flag like
+  `acknowledged` ([#30](https://github.com/luanhssa/owl-notch/issues/30)).
+  Phase 2 (window/tab-level precision via the Accessibility API) stays a
+  separate, deferred stretch goal — `NSWorkspace` only reports the
+  frontmost application, not which tab is visible.
+- 5 new tests covering the pure `SessionStore.isForeground(frontmostBundleIdentifier:session:)`
+  comparison across all session environments.
+
+### Changed
+
+- `SessionFocusService` now exposes `bundleIdentifier(for:)` — the same
+  app-identity mapping `activate(for:)` uses to focus a session, reused by
+  the foreground check instead of a third hardcoded copy of it.
+
 ## [0.3.0] - 2026-08-16
 
 ### Added

@@ -110,12 +110,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func observeStore() {
-        Publishers.CombineLatest3(sessionStore.$isExpanded, sessionStore.$sessions, sessionStore.$expandedSessionID)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _, _, _ in
-                self?.resizePanel()
-            }
-            .store(in: &cancellables)
+        Publishers.CombineLatest4(
+            sessionStore.$isExpanded,
+            sessionStore.$sessions,
+            sessionStore.$expandedSessionID,
+            sessionStore.$frontmostBundleIdentifier
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _, _, _, _ in
+            self?.resizePanel()
+        }
+        .store(in: &cancellables)
     }
 
     private func resizePanel() {

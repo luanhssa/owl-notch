@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import OwlShared
 
@@ -105,17 +106,48 @@ final class SessionStore: ObservableObject {
     /// default preserves production behavior exactly.
     private let persistenceURL: URL
 
+    /// The frontmost application's bundle identifier, kept live so a
+    /// session whose own app (terminal, or Claude Desktop) is already in
+    /// the foreground can stop flagging as "needs attention" — the user is
+    /// already looking at it (GH issue #30). `@Published` so
+    /// `needsAttentionCount`/`sortedSessions`, both computed from it below,
+    /// re-evaluate and notify observers whenever the frontmost app changes.
+    @Published private(set) var frontmostBundleIdentifier: String?
+    private var frontmostAppObserver: NSObjectProtocol?
+
     init(persistenceURL: URL = OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json")) {
         self.persistenceURL = persistenceURL
         loadPersistedSessions()
         pruneTimer = Timer.scheduledTimer(withTimeInterval: Self.pruneInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pruneStaleSessions() }
         }
+
+        frontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        frontmostAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.frontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            }
+        }
     }
 
     deinit {
         pruneTimer?.invalidate()
         persistTimer?.invalidate()
+        if let frontmostAppObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(frontmostAppObserver)
+        }
+    }
+
+    /// Pure comparison, separated from the live `NSWorkspace` observation
+    /// above so it can be unit tested without depending on which app
+    /// actually has focus during a test run.
+    static func isForeground(frontmostBundleIdentifier: String?, session: SessionInfo) -> Bool {
+        guard let frontmostBundleIdentifier else { return false }
+        return frontmostBundleIdentifier == SessionFocusService.bundleIdentifier(for: session)
     }
 
     private func loadPersistedSessions() {
@@ -223,18 +255,24 @@ final class SessionStore: ObservableObject {
         schedulePersist()
     }
 
+    private func isUrgent(_ session: SessionInfo) -> Bool {
+        session.state.isNotable
+            && !session.acknowledged
+            && !Self.isForeground(frontmostBundleIdentifier: frontmostBundleIdentifier, session: session)
+    }
+
     var sortedSessions: [SessionInfo] {
         sessions.values.sorted { lhs, rhs in
             // Sessions wanting attention float to the top; ties broken by recency.
-            let lhsUrgent = lhs.state.isNotable && !lhs.acknowledged
-            let rhsUrgent = rhs.state.isNotable && !rhs.acknowledged
+            let lhsUrgent = isUrgent(lhs)
+            let rhsUrgent = isUrgent(rhs)
             if lhsUrgent != rhsUrgent { return lhsUrgent }
             return lhs.lastEventAt > rhs.lastEventAt
         }
     }
 
     var needsAttentionCount: Int {
-        sessions.values.filter { $0.state.isNotable && !$0.acknowledged }.count
+        sessions.values.filter(isUrgent).count
     }
 
     func handle(envelope: HookEnvelope) {

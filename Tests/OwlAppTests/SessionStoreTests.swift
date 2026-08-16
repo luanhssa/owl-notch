@@ -42,6 +42,57 @@ final class SessionStoreTests: XCTestCase {
         return HookEnvelope(data: data)!
     }
 
+    private func makeSessionInfo(environment: SessionEnvironment, terminalApp: String? = nil) -> SessionInfo {
+        SessionInfo(
+            sessionID: "s",
+            title: nil,
+            projectName: "p",
+            cwd: "/tmp",
+            gitBranch: nil,
+            environment: environment,
+            state: .needsAttention,
+            stateEnteredAt: Date(),
+            lastEventAt: Date(),
+            lastToolName: nil,
+            lastToolSummary: nil,
+            terminalApp: terminalApp
+        )
+    }
+
+    // MARK: - Foreground-session suppression (GH issue #30)
+    //
+    // These test the pure `isForeground` comparison directly, the same way
+    // ProcessAncestryTests tests `classify(ancestorProcessNames:)` — the
+    // live NSWorkspace observation that feeds it can't be deterministically
+    // driven in a unit test (it reflects whatever app actually has focus on
+    // the machine running the test).
+
+    func testIsForegroundMatchesTerminalBundleIdentifier() {
+        let session = makeSessionInfo(environment: .cli, terminalApp: "Warp")
+        XCTAssertTrue(SessionStore.isForeground(frontmostBundleIdentifier: "dev.warp.Warp-Stable", session: session))
+        XCTAssertFalse(SessionStore.isForeground(frontmostBundleIdentifier: "com.apple.Terminal", session: session))
+    }
+
+    func testIsForegroundMatchesClaudeDesktopForCodeEnvironment() {
+        let session = makeSessionInfo(environment: .code)
+        XCTAssertTrue(SessionStore.isForeground(frontmostBundleIdentifier: "com.anthropic.claudefordesktop", session: session))
+    }
+
+    func testIsForegroundMatchesClaudeDesktopForCoworkEnvironment() {
+        let session = makeSessionInfo(environment: .cowork)
+        XCTAssertTrue(SessionStore.isForeground(frontmostBundleIdentifier: "com.anthropic.claudefordesktop", session: session))
+    }
+
+    func testIsForegroundIsFalseWhenNothingIsFrontmostYet() {
+        let session = makeSessionInfo(environment: .cli, terminalApp: "Warp")
+        XCTAssertFalse(SessionStore.isForeground(frontmostBundleIdentifier: nil, session: session))
+    }
+
+    func testIsForegroundFallsBackToTerminalAppForUnknownEnvironmentWithNoTerminalApp() {
+        let session = makeSessionInfo(environment: .unknown, terminalApp: nil)
+        XCTAssertTrue(SessionStore.isForeground(frontmostBundleIdentifier: "com.apple.Terminal", session: session))
+    }
+
     func testNotificationWithoutPermissionSetsNeedsAttention() {
         store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s1"))
         XCTAssertEqual(store.sessions["s1"]?.state, .needsAttention)

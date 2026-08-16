@@ -22,7 +22,7 @@ import OwlShared
 /// `.cowork`/`.cli` still just bring the right app to the front — precise
 /// Cowork targeting and terminal tab/window targeting are stretch goals.
 enum SessionFocusService {
-    private static let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
+    static let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
 
     static func activate(for session: SessionInfo) {
         switch session.environment {
@@ -47,6 +47,19 @@ enum SessionFocusService {
         case .cli, .unknown:
             let appName = session.terminalApp ?? "Terminal"
             activate(bundleIdentifier: bundleIdentifier(forTerminalApp: appName), fallbackAppName: appName)
+        }
+    }
+
+    /// The bundle identifier `activate(for:)` would bring to the front for
+    /// this session — factored out so `SessionStore`'s foreground-session
+    /// suppression (GH issue #30) checks the exact same mapping "jump to
+    /// session" uses, instead of a third hardcoded copy of it.
+    static func bundleIdentifier(for session: SessionInfo) -> String {
+        switch session.environment {
+        case .code, .cowork:
+            return claudeDesktopBundleID
+        case .cli, .unknown:
+            return bundleIdentifier(forTerminalApp: session.terminalApp ?? "Terminal")
         }
     }
 
