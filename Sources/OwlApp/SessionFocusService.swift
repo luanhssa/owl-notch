@@ -19,8 +19,11 @@ import OwlShared
 /// this CLI session at all yet (no on-disk record found), there's nothing to
 /// collide with, so we fall back to the plain CLI session id — that always
 /// goes through the normal import path.
-/// `.cowork`/`.cli` still just bring the right app to the front — precise
-/// Cowork targeting and terminal tab/window targeting are stretch goals.
+/// `.cli`/`.unknown` first try precise tab targeting (below) when the
+/// terminal app and pty are both known and supported; otherwise, and always
+/// for `.cowork`, this just brings the app to the front. Cowork targeting
+/// stays a stretch goal (GH issue #31 covers terminal tab/window targeting
+/// specifically, not Cowork).
 enum SessionFocusService {
     static let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
 
@@ -46,8 +49,90 @@ enum SessionFocusService {
             activate(bundleIdentifier: claudeDesktopBundleID, fallbackAppName: "Claude")
         case .cli, .unknown:
             let appName = session.terminalApp ?? "Terminal"
+            if
+                let tty = session.terminalTTY,
+                supportsPreciseTargeting(terminalAppName: appName),
+                selectTab(withTTY: tty, inTerminalApp: appName)
+            {
+                return
+            }
             activate(bundleIdentifier: bundleIdentifier(forTerminalApp: appName), fallbackAppName: appName)
         }
+    }
+
+    /// Whether `selectTab(withTTY:inTerminalApp:)` below can target this
+    /// terminal app precisely — Terminal.app and iTerm2 both have a mature,
+    /// documented AppleScript dictionary exposing a tab/session's `tty`.
+    /// Every other registered terminal (Warp, Alacritty, kitty, WezTerm,
+    /// Ghostty, VS Code) has no equivalent scripting API, so those fall
+    /// through to the existing app-level `activate(bundleIdentifier:
+    /// fallbackAppName:)` — a real, disclosed gap, not silently pretended
+    /// away (GH issue #31).
+    static func supportsPreciseTargeting(terminalAppName: String) -> Bool {
+        ["Terminal", "iTerm2", "iTerm"].contains(terminalAppName)
+    }
+
+    /// Finds the tab/session whose tty matches, selects it, and brings its
+    /// window to the front — verified against a real local Terminal.app
+    /// (`tty`/`index`/`selected`/`frontmost` are all real, readable
+    /// properties on this machine); iTerm2's dictionary is documented
+    /// identically (session tty, `select` on tab and window) but wasn't
+    /// live-tested since iTerm2 isn't installed here. The actual
+    /// window-raising commands were deliberately not live-tested against
+    /// this machine's real, currently-open terminal windows, to avoid
+    /// visibly disrupting them mid-session — worth one manual smoke test.
+    /// Returns false (falls through to app-level focus) on any mismatch,
+    /// script error, or unsupported app.
+    private static func selectTab(withTTY tty: String, inTerminalApp appName: String) -> Bool {
+        guard tty.hasPrefix("/dev/tty") else { return false }
+
+        let script: String
+        switch appName {
+        case "Terminal":
+            script = """
+            tell application "Terminal"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        if tty of t is "\(tty)" then
+                            set frontmost to true
+                            set index of w to 1
+                            set selected of t to true
+                            return true
+                        end if
+                    end repeat
+                end repeat
+                return false
+            end tell
+            """
+        case "iTerm2", "iTerm":
+            script = """
+            tell application "iTerm2"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        repeat with s in sessions of t
+                            if tty of s is "\(tty)" then
+                                select w
+                                select t
+                                return true
+                            end if
+                        end repeat
+                    end repeat
+                end repeat
+                return false
+            end tell
+            """
+        default:
+            return false
+        }
+
+        guard let appleScript = NSAppleScript(source: script) else { return false }
+        var errorInfo: NSDictionary?
+        let result = appleScript.executeAndReturnError(&errorInfo)
+        if let errorInfo {
+            NSLog("Owl: precise tab targeting for \(appName) failed: \(errorInfo)")
+            return false
+        }
+        return result.booleanValue
     }
 
     /// The bundle identifier `activate(for:)` would bring to the front for

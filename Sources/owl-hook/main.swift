@@ -30,6 +30,7 @@ func exitAllow() -> Never {
 // of doing it after the whole connect/poll dance, which alone can take up
 // to connectTimeoutMs (GH issue #14).
 let ancestry = ProcessAncestry.classify()
+let terminalTTY = ControllingTerminal.ttyPath()
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 
@@ -99,6 +100,9 @@ var envelope: [String: Any] = [
 envelope["environment"] = ancestry.environment
 if let terminalApp = ancestry.terminalApp {
     envelope["terminal_app"] = terminalApp
+}
+if let terminalTTY {
+    envelope["tty"] = terminalTTY
 }
 
 guard let outData = try? JSONSerialization.data(withJSONObject: envelope) else {

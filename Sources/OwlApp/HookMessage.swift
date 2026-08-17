@@ -75,6 +75,10 @@ struct HookEnvelope {
     let eventType: String
     let hookInput: HookInput
     let terminalApp: String?
+    /// The pty device path (e.g. `/dev/ttys003`) owl-hook's controlling
+    /// terminal was attached to when this event fired — lets Owl target
+    /// the exact tab a session is running in, not just its app (GH issue #31).
+    let terminalTTY: String?
     let environment: String // "code" | "cli" | "unknown"
 
     init?(data: Data) {
@@ -85,6 +89,7 @@ struct HookEnvelope {
         self.eventType = eventType
         self.hookInput = HookInput(json: json["hook_input"] as? [String: Any] ?? [:])
         self.terminalApp = json["terminal_app"] as? String
+        self.terminalTTY = json["tty"] as? String
         self.environment = json["environment"] as? String ?? "unknown"
     }
 }

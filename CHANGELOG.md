@@ -10,6 +10,39 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-17
+
+### Added
+
+- Precise "jump to session" tab/window targeting for Terminal.app and
+  iTerm2 ([#31](https://github.com/luanhssa/owl-notch/issues/31)):
+  `owl-hook` now detects its controlling terminal's pty path
+  (`ControllingTerminal.ttyPath()`, opening `/dev/tty` directly rather than
+  checking stdin/stdout/stderr, since Claude Code pipes the hook JSON into
+  this process's stdin) and forwards it in the envelope. `SessionFocusService`
+  uses it to find and select the exact matching tab via AppleScript
+  (`tty of tab`/`tty of session`), falling back to the existing app-level
+  focus for every other registered terminal (Warp, Alacritty, kitty,
+  WezTerm, Ghostty, VS Code) — none of which expose an equivalent
+  scripting API, a real and disclosed gap rather than something papered
+  over.
+- 4 new tests covering the pure "does this terminal support precise
+  targeting" decision and the tty-detection helper; the AppleScript
+  execution itself is deliberately never invoked from a test (see below).
+
+### Verification notes
+
+- Terminal.app's `tty`/`index`/`selected`/`frontmost` properties were
+  verified read-only against this machine's real, currently-open Terminal
+  windows before writing the script (`osascript -e 'tell application
+  "Terminal" to get tty of every tab of every window'` and similar) —
+  confirmed working, real tty paths returned.
+- iTerm2 isn't installed on this machine, so its script is implemented per
+  iTerm2's own official documentation rather than empirically verified.
+- The actual window-raising/tab-selecting commands were **not** live-executed
+  during this session, to avoid visibly disrupting this machine's real, open
+  terminal windows mid-conversation — worth one manual smoke test.
+
 ## [0.7.0] - 2026-08-17
 
 ### Added

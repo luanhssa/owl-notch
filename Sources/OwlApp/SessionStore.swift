@@ -51,6 +51,11 @@ struct SessionInfo: Identifiable, Codable {
     var lastToolName: String?
     var lastToolSummary: String?
     var terminalApp: String?
+    /// The pty device path owl-hook's controlling terminal was attached to
+    /// — lets `SessionFocusService` target the exact tab, not just the app
+    /// (GH issue #31). `nil` if owl-hook had no controlling terminal, or
+    /// for a `.code`/`.cowork` session where it's not meaningful.
+    var terminalTTY: String?
     /// True once the user has jumped to this session via "Abrir sessão" —
     /// clears its urgent-highlight until it becomes notable again.
     var acknowledged: Bool = false
@@ -351,6 +356,7 @@ final class SessionStore: ObservableObject {
         info.lastToolName = input.toolName ?? info.lastToolName
         info.lastToolSummary = Self.summary(for: input)
         info.terminalApp = envelope.terminalApp ?? info.terminalApp
+        info.terminalTTY = envelope.terminalTTY ?? info.terminalTTY
         if let env = SessionEnvironment(rawValue: envelope.environment) {
             info.environment = env
         }
