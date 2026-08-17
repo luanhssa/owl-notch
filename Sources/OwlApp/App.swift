@@ -20,10 +20,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         ipcServer = IPCServer(store: sessionStore)
         ipcServer.start()
+
+        maybeOfferHookInstall()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         ipcServer.stop()
+    }
+
+    private static let hookInstallDismissedKey = "owl.hookInstallPromptDismissed"
+
+    /// Offers to wire Owl's hooks into `~/.claude/settings.json` — the one
+    /// manual step `Scripts/install.sh` deliberately leaves by-hand (GH
+    /// issue #43). Only offered if `owl-hook` is already at its stable
+    /// installed path (otherwise the hooks would point at nothing), the
+    /// hooks aren't already there, and the user hasn't already dismissed
+    /// this before. Never writes anything without the explicit choice made
+    /// in this alert — this rewrites a file Claude Code itself depends on.
+    private func maybeOfferHookInstall() {
+        guard HookInstaller.isOwlHookInstalled() else { return }
+        guard !HookInstaller.areHooksInstalled() else { return }
+        guard !UserDefaults.standard.bool(forKey: Self.hookInstallDismissedKey) else { return }
+
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = "Configurar hooks do Claude Code?"
+        alert.informativeText = "O Owl pode adicionar automaticamente os hooks que ele precisa (Notification, Stop, UserPromptSubmit, PreToolUse) no seu ~/.claude/settings.json. Isso não remove nenhum hook que você já tem — só acrescenta os do Owl — mas reordena as chaves do arquivo (formato JSON padrão) ao salvar."
+        alert.addButton(withTitle: "Instalar automaticamente")
+        alert.addButton(withTitle: "Ver instruções no README")
+        alert.addButton(withTitle: "Agora não")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            if HookInstaller.install() {
+                NSLog("Owl: hooks installed into ~/.claude/settings.json")
+            } else {
+                NSLog("Owl: hook installation reported no changes — was it already set up?")
+            }
+        case .alertSecondButtonReturn:
+            NSWorkspace.shared.open(URL(string: "https://github.com/luanhssa/owl-notch#wiring-up-the-hooks")!)
+        default:
+            UserDefaults.standard.set(true, forKey: Self.hookInstallDismissedKey)
+        }
     }
 
     /// Only meaningful once Owl runs from a real .app bundle (see

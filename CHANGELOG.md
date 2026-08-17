@@ -10,6 +10,30 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-17
+
+### Added
+
+- Owl can now offer to wire its own hooks into `~/.claude/settings.json`
+  automatically ([#43](https://github.com/luanhssa/owl-notch/issues/43)):
+  on first launch, if `owl-hook` is already at its stable installed path
+  and the hooks aren't already set up, a native alert offers to install
+  them, show the manual README instructions instead, or dismiss (which is
+  remembered — it won't ask again). Never writes anything without that
+  explicit, in-the-moment choice. `HookInstaller` merges non-destructively:
+  existing hooks for the same event are kept, Owl's are added alongside
+  them, and re-running it is idempotent (verified with 8 new tests,
+  including one specifically for "an existing hook must survive, not get
+  replaced").
+- `Scripts/install.sh`'s comment referenced a `Scripts/print-hooks-diff.sh`
+  that never existed in the repo — fixed to point at this feature and the
+  README instead.
+
+### Changed
+
+- README's "Wiring up the hooks" section now leads with the automatic
+  option, keeping the manual JSON as the fallback.
+
 ## [0.5.0] - 2026-08-17
 
 ### Added

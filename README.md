@@ -73,9 +73,12 @@ open /Applications/Owl.app
 
 ### Wiring up the hooks
 
-`install.sh` does **not** touch `~/.claude/settings.json` — add the hook
-commands yourself, pointing at the installed path
-(`~/.claude/owl/owl-hook`, not a path inside `.build/`):
+`install.sh` does **not** touch `~/.claude/settings.json` on its own — the
+first time you launch `Owl.app` after `owl-hook` is at its installed path,
+it offers to add the hook commands below automatically (never without
+asking first, and never removing any hooks you already have). Choose "Ver
+instruções no README" in that prompt, or just do it by hand, pointing at
+the installed path (`~/.claude/owl/owl-hook`, not a path inside `.build/`):
 
 ```json
 {

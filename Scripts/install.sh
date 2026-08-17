@@ -7,8 +7,10 @@
 #     it as a login item — it refuses to do so for an app run in place from
 #     an arbitrary directory)
 #
-# This does NOT touch ~/.claude/settings.json — see Scripts/print-hooks-diff.sh
-# for the hook entries to add/verify by hand.
+# This does NOT touch ~/.claude/settings.json — Owl.app itself will offer
+# to wire the hooks in automatically the first time you launch it (once
+# owl-hook is at the stable path above), or see README.md's "Wiring up the
+# hooks" section to add/verify them by hand.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
