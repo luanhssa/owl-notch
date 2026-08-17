@@ -5,6 +5,7 @@ import Combine
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let sessionStore = SessionStore()
+    let tokenUsageStore = TokenUsageStore()
     private var ipcServer: IPCServer!
     private var panel: NSPanel!
     private var aboutWindow: NSWindow?
@@ -97,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
-        let hosting = NSHostingView(rootView: NotchContentView(store: sessionStore, onShowAbout: { [weak self] in
+        let hosting = NSHostingView(rootView: NotchContentView(store: sessionStore, tokenUsageStore: tokenUsageStore, onShowAbout: { [weak self] in
             self?.showAboutWindow()
         }))
         hosting.frame = NSRect(origin: .zero, size: frame.size)
@@ -159,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func frameForPanel(on screen: NSScreen) -> NSRect {
         let (notchWidth, notchHeight) = notchGeometry(on: screen)
         sessionStore.notchWidth = notchWidth
+        sessionStore.notchHeight = notchHeight
         let expanded = sessionStore.isExpanded || sessionStore.needsAttentionCount > 0
 
         let width = expanded ? NotchLayout.expandedWidth : notchWidth
@@ -174,7 +176,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func expandedContentHeight() -> CGFloat {
         let sessions = sessionStore.sortedSessions
-        guard !sessions.isEmpty else { return 40 }
+        // The token-usage row (see `TokenUsageRowView`) is always shown
+        // once expanded, independent of whether there are any sessions —
+        // it's added outside `min(...)` below since it's a fixed single
+        // row, not part of the scrollable/capped session list.
+        let usageHeight = NotchLayout.tokenUsageRowHeight
+        guard !sessions.isEmpty else { return 40 + usageHeight }
 
         var content: CGFloat = 0
         for session in sessions {
@@ -183,7 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 content += NotchLayout.accordionDetailExtraHeight
             }
         }
-        return min(content, NotchLayout.expandedListMaxHeight)
+        return usageHeight + min(content, NotchLayout.expandedListMaxHeight)
     }
 
     private func observeStore() {
@@ -193,8 +200,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sessionStore.$expandedSessionID,
             sessionStore.$frontmostBundleIdentifier
         )
+        // `tokenUsageStore.$snapshot` chained on rather than folded into a
+        // `CombineLatest5` — Combine only ships `CombineLatest` operators up
+        // to 4 publishers as a single struct; chaining `.combineLatest` is
+        // the standard way past that, not a sign this should be split up.
+        .combineLatest(tokenUsageStore.$snapshot)
         .receive(on: DispatchQueue.main)
-        .sink { [weak self] _, _, _, _ in
+        .sink { [weak self] _, _ in
             self?.resizePanel()
         }
         .store(in: &cancellables)

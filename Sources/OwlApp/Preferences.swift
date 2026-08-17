@@ -10,6 +10,8 @@ enum Preferences {
     private static let staleSessionCutoffHoursKey = "owl.staleSessionCutoffHours"
     private static let notifyOnSessionDoneKey = "owl.notifyOnSessionDone"
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
+    private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
+    private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
 
     static let defaultStaleSessionCutoffHours: Double = 12
     static let staleSessionCutoffHoursRange: ClosedRange<Double> = 1...48
@@ -45,5 +47,46 @@ enum Preferences {
 
     static func setSystemNotificationsEnabled(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: systemNotificationsEnabledKey)
+    }
+
+    /// The ceiling the notch's usage bar fills against. Claude Code doesn't
+    /// publish your plan's per-window token allowance anywhere Owl can read
+    /// it — the transcripts only record what was spent — so the ceiling has
+    /// to be a number you set. The default is sized from the heaviest
+    /// 5-hour windows a Max-plan user actually reaches; adjust it until a
+    /// full bar means what a full bar should mean for your plan.
+    static let defaultTokenWindowBudget: Int = 120_000_000
+    /// Bounds in whole multiples of the Preferences slider's 5M step, so
+    /// every reachable slider position is a round number.
+    static let tokenWindowBudgetRange: ClosedRange<Int> = 5_000_000...500_000_000
+
+    static func tokenWindowBudget(defaults: UserDefaults = .standard) -> Int {
+        guard let stored = defaults.object(forKey: tokenWindowBudgetKey) as? Int else {
+            return defaultTokenWindowBudget
+        }
+        return min(max(stored, tokenWindowBudgetRange.lowerBound), tokenWindowBudgetRange.upperBound)
+    }
+
+    static func setTokenWindowBudget(_ tokens: Int, defaults: UserDefaults = .standard) {
+        let clamped = min(max(tokens, tokenWindowBudgetRange.lowerBound), tokenWindowBudgetRange.upperBound)
+        defaults.set(clamped, forKey: tokenWindowBudgetKey)
+    }
+
+    /// The weekly counterpart of `tokenWindowBudget`, unreadable from
+    /// Claude Code for the same reason and so configurable for the same
+    /// reason. Bounds are multiples of the Preferences slider's 25M step.
+    static let defaultWeeklyTokenBudget: Int = 400_000_000
+    static let weeklyTokenBudgetRange: ClosedRange<Int> = 25_000_000...2_000_000_000
+
+    static func weeklyTokenBudget(defaults: UserDefaults = .standard) -> Int {
+        guard let stored = defaults.object(forKey: weeklyTokenBudgetKey) as? Int else {
+            return defaultWeeklyTokenBudget
+        }
+        return min(max(stored, weeklyTokenBudgetRange.lowerBound), weeklyTokenBudgetRange.upperBound)
+    }
+
+    static func setWeeklyTokenBudget(_ tokens: Int, defaults: UserDefaults = .standard) {
+        let clamped = min(max(tokens, weeklyTokenBudgetRange.lowerBound), weeklyTokenBudgetRange.upperBound)
+        defaults.set(clamped, forKey: weeklyTokenBudgetKey)
     }
 }

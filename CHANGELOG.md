@@ -10,6 +10,45 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-17
+
+### Added
+
+- Token-usage bars in the expanded notch, laid out like Claude Code's own
+  `/usage` panel: one row per limit, each with its name, when it resets,
+  the percentage consumed, and a blue bar underneath. Two limits are
+  shown — the current 5-hour window ("Reinicia em 4h 17min") and the
+  calendar week ("Reinicia dom., 00:00").
+
+  Computed by `TokenUsageService` reading the same transcript JSONL files
+  under `~/.claude/projects` that Claude Code itself writes (there's no
+  API for this), deduplicated by `message.id`/`requestId` so resumed or
+  compacted sessions don't double-count a turn, and grouped into 5-hour
+  windows anchored to the top of the hour the way Claude Code's own usage
+  reporting does. Refreshed every 30s in the background via
+  `TokenUsageStore`, an `ObservableObject` that never blocks the main
+  actor while scanning.
+
+  The weekly row is the *calendar* week in your locale: Claude Code's
+  weekly limit resets on a per-account schedule that isn't recorded in
+  the transcripts, so Owl can't mirror its exact reset instant.
+- "Limite da janela de 5h" and "Limite semanal" settings in Preferences,
+  the ceilings the bars fill against. Claude Code doesn't expose your
+  plan's allowances anywhere Owl can read, so these are numbers you set —
+  they default to 120M and 400M tokens.
+- An "Encerrar o Owl" button in the About panel. Owl runs as an accessory
+  app — no Dock icon, no menu bar item, and no main menu for ⌘Q to hang
+  off — so until now Activity Monitor or `pkill` were the only ways to
+  stop it.
+
+### Fixed
+
+- The collapsed notch is now clickable across its whole area. A `.plain`
+  SwiftUI button only hit-tests where its label actually draws, so the
+  toggle's real target was the ~11pt bird glyph rather than the pill it
+  looks like — the header now fills the notch's measured height and
+  stamps a `contentShape` over it.
+
 ## [0.13.1] - 2026-08-17
 
 ### Changed

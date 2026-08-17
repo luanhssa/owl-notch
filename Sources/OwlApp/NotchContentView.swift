@@ -62,6 +62,120 @@ struct EnvironmentTagView: View {
     }
 }
 
+/// "Reinicia em 4h 17min" — used for the 5-hour window, which always
+/// resets soon enough that a countdown is more useful than a clock time.
+private func resetsInLabel(until end: Date, now: Date) -> String {
+    let minutes = Int(max(0, end.timeIntervalSince(now)) / 60)
+    guard minutes >= 60 else { return "Reinicia em \(minutes)min" }
+    return "Reinicia em \(minutes / 60)h \(minutes % 60)min"
+}
+
+/// "Reinicia dom., 00:00" — used for the weekly total, where a countdown
+/// in days would be vaguer than just naming the day it rolls over.
+private func resetsAtLabel(_ end: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale.current
+    formatter.setLocalizedDateFormatFromTemplate("EEE HH:mm")
+    return "Reinicia \(formatter.string(from: end))"
+}
+
+/// The filled portion of a usage bar, drawn proportionally to the width
+/// it's given. `GeometryReader` rather than a fixed width because the bar
+/// spans the full row, which depends on the expanded panel width.
+private struct UsageBarView: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.white.opacity(NotchStyle.tokenUsageBarTrackOpacity))
+                Capsule()
+                    .fill(NotchStyle.tokenUsageBarTint)
+                    // A limit that's barely been touched still gets a
+                    // visible nub instead of nothing — a hairline of fill
+                    // reads as "empty", which is a different state here.
+                    .frame(width: progress > 0
+                        ? max(NotchStyle.tokenUsageBarHeight, progress * geometry.size.width)
+                        : 0)
+            }
+        }
+        .frame(height: NotchStyle.tokenUsageBarHeight)
+    }
+}
+
+/// One limit: its name, when it resets, the percentage consumed, and the
+/// bar underneath — the same anatomy Claude Code's own `/usage` panel
+/// uses, so the two read as the same information rather than two
+/// different accountings of it.
+private struct UsageLimitRowView: View {
+    let title: String
+    let resetLabel: String
+    let tokens: Int
+    let budget: Int
+
+    private var progress: Double {
+        guard budget > 0 else { return 0 }
+        return min(1, Double(tokens) / Double(budget))
+    }
+
+    var body: some View {
+        VStack(spacing: NotchStyle.tokenUsageItemSpacing) {
+            HStack(spacing: NotchStyle.tokenUsageRowSpacing) {
+                Text(title)
+                    .font(.system(size: NotchStyle.tokenUsageFontSize))
+                    .foregroundStyle(.white.opacity(NotchStyle.tokenUsageValueOpacity))
+                Spacer(minLength: 0)
+                Text(resetLabel)
+                    .font(.system(size: NotchStyle.tokenUsageFontSize))
+                    .foregroundStyle(.white.opacity(NotchStyle.tokenUsageLabelOpacity))
+                    .lineLimit(1)
+                Text("\(Int((progress * 100).rounded()))%")
+                    .font(.system(size: NotchStyle.tokenUsageFontSize, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(NotchStyle.tokenUsageValueOpacity))
+            }
+            UsageBarView(progress: progress)
+        }
+    }
+}
+
+/// Usage bars for the two Claude Code limits Owl can reconstruct from the
+/// transcripts — the current 5-hour window and the calendar week — shown
+/// right below the notch header whenever it's expanded. See
+/// `TokenUsageService` for how each is computed, `Preferences` for the
+/// budgets they fill against, and `TokenUsageStore` for how both get here
+/// as `@Published` values.
+struct TokenUsageRowView: View {
+    let snapshot: TokenUsageService.Snapshot
+    let windowBudget: Int
+    let weeklyBudget: Int
+
+    var body: some View {
+        VStack(spacing: NotchStyle.tokenUsageSectionSpacing) {
+            // Recomputed every minute for the same reason the per-session
+            // "há Xmin nesse estado" label is (GH issue #17) — nothing
+            // else would re-render the countdown.
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                UsageLimitRowView(
+                    title: "Limite de 5 horas",
+                    resetLabel: snapshot.windowEnd.map { resetsInLabel(until: $0, now: context.date) } ?? "Ocioso",
+                    tokens: snapshot.windowTokens,
+                    budget: windowBudget
+                )
+            }
+
+            UsageLimitRowView(
+                title: "Semanal",
+                resetLabel: snapshot.weekEnd.map(resetsAtLabel) ?? "",
+                tokens: snapshot.weekTokens,
+                budget: weeklyBudget
+            )
+        }
+        .padding(.horizontal, NotchStyle.tokenUsageRowHorizontalPadding)
+        .frame(height: NotchLayout.tokenUsageRowHeight)
+    }
+}
+
 /// A small looping pulse next to the last-tool summary, shown only while a
 /// session is `.running` — a static row otherwise looks identical whether
 /// Claude is actively working or has silently stalled (GH issue #35).
@@ -205,6 +319,9 @@ struct SessionRowView: View {
 
 struct NotchContentView: View {
     @ObservedObject var store: SessionStore
+    /// Explicit dependency injection, same as `store` above (PATTERNS.md
+    /// #9) — never `@EnvironmentObject`.
+    @ObservedObject var tokenUsageStore: TokenUsageStore
     /// Opens the About/Troubleshooting window (GH issue #37) — Owl has no
     /// Dock icon or menu bar item, so this button in the expanded header is
     /// the only way to reach it.
@@ -229,6 +346,15 @@ struct NotchContentView: View {
                 } label: {
                     NotchPillView(store: store)
                         .padding(.vertical, NotchStyle.pillVerticalPadding)
+                        // Without an explicit `contentShape`, a `.plain`
+                        // button only hit-tests where its label actually
+                        // draws — which here is the ~11pt bird glyph, not
+                        // the pill around it. Filling the header and
+                        // stamping a rectangle over it makes the whole
+                        // notch-sized area clickable, which is what it
+                        // looks like it should be.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -278,9 +404,20 @@ struct NotchContentView: View {
                     }
                 }
             }
+            // Pins the header to the real notch's height so the toggle
+            // button above can fill it — the pill's own intrinsic height is
+            // several points shorter, and that gap was dead space.
+            .frame(height: store.notchHeight)
 
             if effectiveExpanded {
                 Divider().background(Color.white.opacity(NotchStyle.primaryDividerOpacity))
+
+                TokenUsageRowView(
+                    snapshot: tokenUsageStore.snapshot,
+                    windowBudget: tokenUsageStore.windowBudget,
+                    weeklyBudget: tokenUsageStore.weeklyBudget
+                )
+                Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
 
                 // Captured once instead of accessed repeatedly below —
                 // `sortedSessions` re-sorts on every access (GH issue #18),
