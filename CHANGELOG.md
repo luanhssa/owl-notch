@@ -10,6 +10,27 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-17
+
+### Added
+
+- An optional system notification for a session that needs attention
+  ([#32](https://github.com/luanhssa/owl-notch/issues/32)), off by
+  default since enabling it triggers a one-time OS permission prompt.
+  New `SystemNotificationService` wraps `UNUserNotificationCenter`; fires
+  from the same "just became newly notable" transition in
+  `handle(envelope:)` that un-acknowledges a session, gated through a new
+  pure `SessionStore.shouldSendSystemNotification(...)` that mirrors
+  `isUrgent`'s foreground/snooze checks exactly — a system notification
+  only fires for a transition that would also flag the notch itself.
+  Deliberately doesn't try to auto-detect "the notch isn't visible"
+  (locked screen, no notch display) — that's real complexity for
+  dubious reliability; the toggle in Preferences covers the same need
+  more simply, in line with the "don't let the notch grow needless
+  configurability" reasoning behind [#34](https://github.com/luanhssa/owl-notch/issues/34)
+  and [#48](https://github.com/luanhssa/owl-notch/issues/48).
+  5 new tests; all 77 pass.
+
 ## [0.12.0] - 2026-08-17
 
 ### Added

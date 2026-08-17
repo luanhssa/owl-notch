@@ -6,11 +6,13 @@ import SwiftUI
 struct PreferencesView: View {
     @State private var staleSessionCutoffHours: Double
     @State private var notifyOnSessionDone: Bool
+    @State private var systemNotificationsEnabled: Bool
     @State private var loginItemEnabled: Bool
 
     init() {
         _staleSessionCutoffHours = State(initialValue: Preferences.staleSessionCutoffHours())
         _notifyOnSessionDone = State(initialValue: Preferences.notifyOnSessionDone())
+        _systemNotificationsEnabled = State(initialValue: Preferences.systemNotificationsEnabled())
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
     }
 
@@ -46,6 +48,30 @@ struct PreferencesView: View {
                     .onChange(of: notifyOnSessionDone) { newValue in
                         Preferences.setNotifyOnSessionDone(newValue)
                     }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Notificações")
+                    .font(.headline)
+
+                if SystemNotificationService.isAvailable {
+                    Toggle("Notificação do sistema quando precisar de atenção", isOn: $systemNotificationsEnabled)
+                        .onChange(of: systemNotificationsEnabled) { newValue in
+                            Preferences.setSystemNotificationsEnabled(newValue)
+                            if newValue {
+                                SystemNotificationService.requestAuthorizationIfNeeded()
+                            }
+                        }
+                    Text("Útil quando a tela está bloqueada ou nenhum display com notch está conectado.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Disponível apenas quando o Owl roda como aplicativo instalado.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()

@@ -25,9 +25,11 @@ Click the pill to expand it, or press **⌥⌘O** from anywhere to toggle it
 open/closed on demand, even if Owl isn't the frontmost app. The small
 info button in the expanded header opens an About panel with a link to
 Preferences — the stale-session cutoff, whether a finished session counts
-as urgent, and the "open at login" toggle. The moon button next to it
-snoozes every session's urgent highlight for 30 minutes of focus time;
-each session also has its own snooze button, in its expanded row.
+as urgent, an optional system notification for when a session needs
+attention while the notch itself isn't a reliable signal (locked screen,
+no notch display), and the "open at login" toggle. The moon button next
+to it snoozes every session's urgent highlight for 30 minutes of focus
+time; each session also has its own snooze button, in its expanded row.
 
 ## How it works
 

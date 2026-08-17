@@ -257,6 +257,64 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.needsAttentionCount, 2, "toggling again cancels the snooze")
     }
 
+    // MARK: - System notification decision (GH issue #32)
+
+    func testShouldSendSystemNotificationFalseWhenDisabled() {
+        let session = makeSessionInfo(environment: .cli)
+        XCTAssertFalse(SessionStore.shouldSendSystemNotification(
+            for: session,
+            systemNotificationsEnabled: false,
+            frontmostBundleIdentifier: nil,
+            globalSnoozedUntil: nil,
+            now: Date()
+        ))
+    }
+
+    func testShouldSendSystemNotificationFalseWhenSessionIsForeground() {
+        let session = makeSessionInfo(environment: .cli, terminalApp: "Warp")
+        XCTAssertFalse(SessionStore.shouldSendSystemNotification(
+            for: session,
+            systemNotificationsEnabled: true,
+            frontmostBundleIdentifier: "dev.warp.Warp-Stable",
+            globalSnoozedUntil: nil,
+            now: Date()
+        ))
+    }
+
+    func testShouldSendSystemNotificationFalseWhenGloballySnoozed() {
+        let session = makeSessionInfo(environment: .cli)
+        XCTAssertFalse(SessionStore.shouldSendSystemNotification(
+            for: session,
+            systemNotificationsEnabled: true,
+            frontmostBundleIdentifier: nil,
+            globalSnoozedUntil: Date().addingTimeInterval(60),
+            now: Date()
+        ))
+    }
+
+    func testShouldSendSystemNotificationFalseWhenSessionSnoozed() {
+        var session = makeSessionInfo(environment: .cli)
+        session.snoozedUntil = Date().addingTimeInterval(60)
+        XCTAssertFalse(SessionStore.shouldSendSystemNotification(
+            for: session,
+            systemNotificationsEnabled: true,
+            frontmostBundleIdentifier: nil,
+            globalSnoozedUntil: nil,
+            now: Date()
+        ))
+    }
+
+    func testShouldSendSystemNotificationTrueWhenEnabledAndNothingSuppressesIt() {
+        let session = makeSessionInfo(environment: .cli, terminalApp: "Warp")
+        XCTAssertTrue(SessionStore.shouldSendSystemNotification(
+            for: session,
+            systemNotificationsEnabled: true,
+            frontmostBundleIdentifier: "com.apple.Finder",
+            globalSnoozedUntil: nil,
+            now: Date()
+        ))
+    }
+
     func testPersistedSessionRespectsConfiguredStaleCutoff() throws {
         Preferences.setStaleSessionCutoffHours(1, defaults: defaults)
 

@@ -9,6 +9,7 @@ import Foundation
 enum Preferences {
     private static let staleSessionCutoffHoursKey = "owl.staleSessionCutoffHours"
     private static let notifyOnSessionDoneKey = "owl.notifyOnSessionDone"
+    private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
 
     static let defaultStaleSessionCutoffHours: Double = 12
     static let staleSessionCutoffHoursRange: ClosedRange<Double> = 1...48
@@ -33,5 +34,16 @@ enum Preferences {
 
     static func setNotifyOnSessionDone(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: notifyOnSessionDoneKey)
+    }
+
+    /// Off by default — turning it on triggers a one-time OS permission
+    /// prompt (GH issue #32), so this shouldn't be silently opt-in the way
+    /// `notifyOnSessionDone` is.
+    static func systemNotificationsEnabled(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: systemNotificationsEnabledKey) as? Bool ?? false
+    }
+
+    static func setSystemNotificationsEnabled(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: systemNotificationsEnabledKey)
     }
 }

@@ -228,6 +228,26 @@ final class SessionStore: ObservableObject {
         isSnoozeActive(session.snoozedUntil, now: now)
     }
 
+    /// Pure decision extracted for testability (GH issue #32) — whether a
+    /// fresh notable transition should trigger a system notification,
+    /// independent of whether `UNUserNotificationCenter` is actually
+    /// available. Mirrors `isUrgent`'s foreground/snooze gates exactly: a
+    /// system notification should only fire for a transition that would
+    /// also flag the notch itself.
+    static func shouldSendSystemNotification(
+        for session: SessionInfo,
+        systemNotificationsEnabled: Bool,
+        frontmostBundleIdentifier: String?,
+        globalSnoozedUntil: Date?,
+        now: Date
+    ) -> Bool {
+        guard systemNotificationsEnabled else { return false }
+        guard !isForeground(frontmostBundleIdentifier: frontmostBundleIdentifier, session: session) else { return false }
+        guard !isSnoozeActive(globalSnoozedUntil, now: now) else { return false }
+        guard !isSnoozeActive(session.snoozedUntil, now: now) else { return false }
+        return true
+    }
+
     private func loadPersistedSessions() {
         guard
             let data = try? Data(contentsOf: persistenceURL),
@@ -450,6 +470,15 @@ final class SessionStore: ObservableObject {
         if SessionState.isNotable(newState, notifyOnSessionDone: Preferences.notifyOnSessionDone(defaults: defaults))
             && (stateChanged || isFreshNotification) {
             info.acknowledged = false
+            if Self.shouldSendSystemNotification(
+                for: info,
+                systemNotificationsEnabled: Preferences.systemNotificationsEnabled(defaults: defaults),
+                frontmostBundleIdentifier: frontmostBundleIdentifier,
+                globalSnoozedUntil: globalSnoozedUntil,
+                now: Date()
+            ) {
+                SystemNotificationService.notify(session: info)
+            }
         }
         info.lastEventAt = Date()
         info.lastToolName = input.toolName ?? info.lastToolName
