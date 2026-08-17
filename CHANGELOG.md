@@ -10,6 +10,33 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-17
+
+### Added
+
+- A focus-time snooze ([#33](https://github.com/luanhssa/owl-notch/issues/33)),
+  global and per-session, both fixed at 30 minutes rather than
+  configurable — same "don't let the notch grow needless configurability"
+  reasoning as [#34](https://github.com/luanhssa/owl-notch/issues/34)'s
+  `notifyOnSessionDone` and the [#48](https://github.com/luanhssa/owl-notch/issues/48)
+  decision:
+  - **Global** — a new moon button next to the About button in the
+    expanded header suppresses the urgent badge/auto-expand for every
+    session at once. Deliberately not persisted across relaunches (it's a
+    short-lived "leave me alone" state, not a standing preference).
+  - **Per-session** — a new bell-slash button in each session's expanded
+    row snoozes just that one. Persisted as part of the session (like
+    `acknowledged`), so it survives a relaunch, with a live "silenciado
+    por mais Xm" caption.
+  - A snooze can expire with no new hook event to trigger a natural
+    re-render (the same problem [#17](https://github.com/luanhssa/owl-notch/issues/17)
+    solved for the elapsed-time label) — `SessionStore` now runs a
+    15-second tick, active only while a snooze is outstanding, that
+    forces `needsAttentionCount`/`sortedSessions` to re-evaluate against
+    the current time.
+  - 5 new tests covering the pure `isSnoozeActive` comparison and both
+    toggle paths; all 72 pass.
+
 ## [0.11.0] - 2026-08-17
 
 ### Added

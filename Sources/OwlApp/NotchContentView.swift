@@ -19,6 +19,10 @@ private func elapsedLabel(since date: Date, now: Date) -> String {
     return "\(hours)h"
 }
 
+private func remainingSnoozeMinutes(until: Date) -> Int {
+    max(0, Int(ceil(until.timeIntervalSinceNow / 60)))
+}
+
 struct NotchPillView: View {
     @ObservedObject var store: SessionStore
 
@@ -140,6 +144,11 @@ struct SessionRowView: View {
                             Spacer()
                         }
                     }
+                    if let snoozedUntil = session.snoozedUntil, SessionStore.isSessionSnoozed(session) {
+                        Text("🔕 silenciado por mais \(remainingSnoozeMinutes(until: snoozedUntil))m")
+                            .font(.system(size: NotchStyle.captionFontSize))
+                            .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
+                    }
                     if let summary = session.lastToolSummary {
                         HStack(alignment: .top, spacing: NotchStyle.toolSummarySpacing) {
                             if session.state == .running {
@@ -153,22 +162,39 @@ struct SessionRowView: View {
                         }
                     }
 
-                    Button {
-                        store.acknowledge(sessionID: session.sessionID)
-                        SessionFocusService.activate(for: session)
-                    } label: {
-                        HStack(spacing: NotchStyle.actionButtonContentSpacing) {
-                            Text("Abrir sessão")
-                                .font(.system(size: NotchStyle.bodyFontSize, weight: .semibold))
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                    HStack(spacing: NotchStyle.rowSpacing) {
+                        Button {
+                            store.acknowledge(sessionID: session.sessionID)
+                            SessionFocusService.activate(for: session)
+                        } label: {
+                            HStack(spacing: NotchStyle.actionButtonContentSpacing) {
+                                Text("Abrir sessão")
+                                    .font(.system(size: NotchStyle.bodyFontSize, weight: .semibold))
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                            }
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, NotchStyle.actionButtonHorizontalPadding)
+                            .padding(.vertical, NotchStyle.actionButtonVerticalPadding)
+                            .background(RoundedRectangle(cornerRadius: NotchStyle.actionButtonCornerRadius).fill(Color.white.opacity(NotchStyle.actionButtonBackgroundOpacity)))
                         }
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, NotchStyle.actionButtonHorizontalPadding)
-                        .padding(.vertical, NotchStyle.actionButtonVerticalPadding)
-                        .background(RoundedRectangle(cornerRadius: NotchStyle.actionButtonCornerRadius).fill(Color.white.opacity(NotchStyle.actionButtonBackgroundOpacity)))
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        // Per-session focus-time snooze (GH issue #33) —
+                        // suppresses just this session's urgent badge.
+                        Button {
+                            store.toggleSnooze(sessionID: session.sessionID)
+                        } label: {
+                            Image(systemName: SessionStore.isSessionSnoozed(session) ? "bell.slash.fill" : "bell.slash")
+                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                                .foregroundStyle(SessionStore.isSessionSnoozed(session) ? Color.orange : .white.opacity(NotchStyle.iconButtonOpacity))
+                                .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, NotchStyle.rowHorizontalPadding)
                 .padding(.bottom, NotchStyle.detailBottomPadding)
@@ -208,15 +234,33 @@ struct NotchContentView: View {
 
                 if effectiveExpanded {
                     HStack(spacing: 0) {
-                        Button(action: onShowAbout) {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
-                                .foregroundStyle(.white.opacity(NotchStyle.iconButtonOpacity))
-                                .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
-                                .contentShape(Rectangle())
+                        HStack(spacing: NotchStyle.headerIconSpacing) {
+                            Button(action: onShowAbout) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                                    .foregroundStyle(.white.opacity(NotchStyle.iconButtonOpacity))
+                                    .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            // Global focus-time snooze (GH issue #33) — suppresses
+                            // the urgent badge/auto-expand for every session at once.
+                            Button {
+                                store.toggleGlobalSnooze()
+                            } label: {
+                                Image(systemName: store.isGloballySnoozed ? "moon.fill" : "moon")
+                                    .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                                    .foregroundStyle(store.isGloballySnoozed ? Color.orange : .white.opacity(NotchStyle.iconButtonOpacity))
+                                    .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.leading, max(NotchStyle.iconButtonMinimumSidePadding, (earWidth - NotchStyle.iconButtonSize) / 2))
+                        .padding(.leading, max(
+                            NotchStyle.iconButtonMinimumSidePadding,
+                            (earWidth - (2 * NotchStyle.iconButtonSize + NotchStyle.headerIconSpacing)) / 2
+                        ))
 
                         Spacer()
 

@@ -216,6 +216,47 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.needsAttentionCount, 1, "notifyOnSessionDone only gates .done, not needsAttention/needsApproval")
     }
 
+    // MARK: - Focus-time snooze (GH issue #33)
+
+    func testIsSnoozeActiveTrueWhenUntilIsInTheFuture() {
+        XCTAssertTrue(SessionStore.isSnoozeActive(Date().addingTimeInterval(60), now: Date()))
+    }
+
+    func testIsSnoozeActiveFalseWhenUntilIsInThePast() {
+        XCTAssertFalse(SessionStore.isSnoozeActive(Date().addingTimeInterval(-60), now: Date()))
+    }
+
+    func testIsSnoozeActiveFalseWhenNil() {
+        XCTAssertFalse(SessionStore.isSnoozeActive(nil, now: Date()))
+    }
+
+    func testToggleGlobalSnoozeSuppressesAllUrgencyThenCancelsOnSecondToggle() {
+        store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s1"))
+        XCTAssertEqual(store.needsAttentionCount, 1)
+
+        store.toggleGlobalSnooze()
+        XCTAssertTrue(store.isGloballySnoozed)
+        XCTAssertEqual(store.needsAttentionCount, 0)
+
+        store.toggleGlobalSnooze()
+        XCTAssertFalse(store.isGloballySnoozed)
+        XCTAssertEqual(store.needsAttentionCount, 1)
+    }
+
+    func testToggleSnoozeSuppressesOnlyThatSession() {
+        store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s1"))
+        store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s2"))
+        XCTAssertEqual(store.needsAttentionCount, 2)
+
+        store.toggleSnooze(sessionID: "s1")
+        XCTAssertEqual(store.needsAttentionCount, 1)
+        XCTAssertTrue(SessionStore.isSessionSnoozed(store.sessions["s1"]!))
+        XCTAssertFalse(SessionStore.isSessionSnoozed(store.sessions["s2"]!))
+
+        store.toggleSnooze(sessionID: "s1")
+        XCTAssertEqual(store.needsAttentionCount, 2, "toggling again cancels the snooze")
+    }
+
     func testPersistedSessionRespectsConfiguredStaleCutoff() throws {
         Preferences.setStaleSessionCutoffHours(1, defaults: defaults)
 

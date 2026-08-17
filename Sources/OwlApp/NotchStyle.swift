@@ -47,6 +47,10 @@ enum NotchStyle {
     static let pulsingDotSize: CGFloat = 5
     static let iconButtonSize: CGFloat = 20
     static let iconButtonMinimumSidePadding: CGFloat = 4
+    /// Gap between clustered header icons (e.g. the About + snooze buttons
+    /// sharing the left ear, GH issue #33) — distinct from
+    /// `iconButtonMinimumSidePadding`, which is about the ear's outer edge.
+    static let headerIconSpacing: CGFloat = 4
 
     // MARK: - Spacing / padding
 

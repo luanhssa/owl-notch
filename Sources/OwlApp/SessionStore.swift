@@ -73,6 +73,11 @@ struct SessionInfo: Identifiable, Codable {
     /// True once the user has jumped to this session via "Abrir sessão" —
     /// clears its urgent-highlight until it becomes notable again.
     var acknowledged: Bool = false
+    /// The time until which this session's urgent-highlight/auto-expand is
+    /// suppressed — set by the per-session "silenciar" action (GH issue
+    /// #33). `nil` means not snoozed; a past value is simply inert, not
+    /// actively cleared once it elapses.
+    var snoozedUntil: Date?
 
     var id: String { sessionID }
 
@@ -94,6 +99,18 @@ final class SessionStore: ObservableObject {
     /// AppDelegate — lets the SwiftUI content know how much of the expanded
     /// panel's width is "ear" (outside the real notch) versus centered over it.
     @Published var notchWidth: CGFloat = 180
+
+    /// The time until which *every* session's urgent-highlight/auto-expand
+    /// is suppressed — the global half of the focus-time snooze (GH issue
+    /// #33). Deliberately not persisted: it's a short-lived "leave me
+    /// alone for a bit" state, not something that should silently survive
+    /// a relaunch, unlike the per-session version on `SessionInfo`.
+    @Published private(set) var globalSnoozedUntil: Date?
+
+    /// Fixed rather than configurable — same "don't let the notch grow
+    /// needless configurability" reasoning as #34's `notifyOnSessionDone`
+    /// and the #48 decision.
+    private static let snoozeDuration: TimeInterval = 30 * 60
 
     /// Sessions with no new event in this long are dropped — a session that
     /// went quiet has no "click to jump back" value left. User-configurable
@@ -122,6 +139,16 @@ final class SessionStore: ObservableObject {
     /// long enough that a busy session doesn't hit the disk on every event.
     private static let persistDebounceInterval: TimeInterval = 1.5
     private var persistTimer: Timer?
+
+    /// A snooze can silently pass its `until` time with no new hook event
+    /// to trigger a natural re-render (GH issue #33) — the same problem
+    /// #17 solved for the elapsed-time label via `TimelineView`, but the
+    /// state that needs to "tick" here feeds `needsAttentionCount`, which
+    /// `AppDelegate` also uses for auto-expand/panel sizing outside
+    /// SwiftUI. `refreshForSnoozeTick()` below is a no-op while no snooze
+    /// is outstanding, which is the common case.
+    private static let snoozeTickInterval: TimeInterval = 15
+    private var snoozeTickTimer: Timer?
 
     /// Injectable so tests can point it at a throwaway temp file instead of
     /// the real `~/Library/Application Support/Owl/sessions.json` — the
@@ -152,6 +179,9 @@ final class SessionStore: ObservableObject {
         pruneTimer = Timer.scheduledTimer(withTimeInterval: Self.pruneInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pruneStaleSessions() }
         }
+        snoozeTickTimer = Timer.scheduledTimer(withTimeInterval: Self.snoozeTickInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshForSnoozeTick() }
+        }
 
         frontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         frontmostAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -168,6 +198,7 @@ final class SessionStore: ObservableObject {
     deinit {
         pruneTimer?.invalidate()
         persistTimer?.invalidate()
+        snoozeTickTimer?.invalidate()
         if let frontmostAppObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(frontmostAppObserver)
         }
@@ -179,6 +210,22 @@ final class SessionStore: ObservableObject {
     static func isForeground(frontmostBundleIdentifier: String?, session: SessionInfo) -> Bool {
         guard let frontmostBundleIdentifier else { return false }
         return frontmostBundleIdentifier == SessionFocusService.bundleIdentifier(for: session)
+    }
+
+    /// Pure comparison shared by the global and per-session snooze checks
+    /// (and their tests) — `now` injected for determinism, same pattern as
+    /// `isForeground` above.
+    static func isSnoozeActive(_ until: Date?, now: Date) -> Bool {
+        guard let until else { return false }
+        return until > now
+    }
+
+    var isGloballySnoozed: Bool {
+        Self.isSnoozeActive(globalSnoozedUntil, now: Date())
+    }
+
+    static func isSessionSnoozed(_ session: SessionInfo, now: Date = Date()) -> Bool {
+        isSnoozeActive(session.snoozedUntil, now: now)
     }
 
     private func loadPersistedSessions() {
@@ -298,9 +345,34 @@ final class SessionStore: ObservableObject {
     }
 
     private func isUrgent(_ session: SessionInfo) -> Bool {
-        SessionState.isNotable(session.state, notifyOnSessionDone: Preferences.notifyOnSessionDone(defaults: defaults))
+        let now = Date()
+        return SessionState.isNotable(session.state, notifyOnSessionDone: Preferences.notifyOnSessionDone(defaults: defaults))
             && !session.acknowledged
             && !Self.isForeground(frontmostBundleIdentifier: frontmostBundleIdentifier, session: session)
+            && !Self.isSnoozeActive(globalSnoozedUntil, now: now)
+            && !Self.isSnoozeActive(session.snoozedUntil, now: now)
+    }
+
+    /// Suppresses (or un-suppresses) the urgent badge/auto-expand for every
+    /// session at once, for a fixed focus-time window (GH issue #33).
+    func toggleGlobalSnooze() {
+        globalSnoozedUntil = isGloballySnoozed ? nil : Date().addingTimeInterval(Self.snoozeDuration)
+    }
+
+    /// Suppresses (or un-suppresses) just one session's urgent badge for
+    /// the same fixed window as the global snooze (GH issue #33) —
+    /// persisted as part of the session itself, so it survives a relaunch
+    /// the same way `acknowledged` does.
+    func toggleSnooze(sessionID: String) {
+        guard var info = sessions[sessionID] else { return }
+        info.snoozedUntil = Self.isSessionSnoozed(info) ? nil : Date().addingTimeInterval(Self.snoozeDuration)
+        sessions[sessionID] = info
+        schedulePersist()
+    }
+
+    private func refreshForSnoozeTick() {
+        guard globalSnoozedUntil != nil || sessions.values.contains(where: { $0.snoozedUntil != nil }) else { return }
+        sessions = sessions
     }
 
     var sortedSessions: [SessionInfo] {
