@@ -21,6 +21,9 @@ events and displays state. It never blocks a tool call, never influences a
 permission decision, and fails open — if Owl isn't running or doesn't
 respond within ~250ms, Claude Code behaves exactly as if Owl didn't exist.
 
+Click the pill to expand it, or press **⌥⌘O** from anywhere to toggle it
+open/closed on demand, even if Owl isn't the frontmost app.
+
 ## How it works
 
 ```

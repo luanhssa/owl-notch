@@ -10,6 +10,27 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-17
+
+### Added
+
+- A global keyboard shortcut, **⌥⌘O**, toggles the notch panel open/closed
+  from anywhere — even when Owl isn't the frontmost app
+  ([#44](https://github.com/luanhssa/owl-notch/issues/44)). Implemented via
+  the Carbon Hot Key API (`GlobalHotKey`) rather than an `NSEvent` global
+  monitor, so it doesn't require Input Monitoring/Accessibility permission.
+  Fixed rather than configurable for now — there's nowhere to configure it
+  until the Preferences window (#34) exists; worth revisiting then.
+  Mentioned in the README.
+
+### Verification notes
+
+- No automated test covers the actual hotkey registration/firing — like
+  the AppleScript execution added for #31, this is a live system
+  integration (a real global hotkey registration) that shouldn't be
+  exercised from a test process. Verified via a clean debug and release
+  build only.
+
 ## [0.8.0] - 2026-08-17
 
 ### Added

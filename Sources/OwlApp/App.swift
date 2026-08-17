@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var ipcServer: IPCServer!
     private var panel: NSPanel!
     private var aboutWindow: NSWindow?
+    private var globalHotKey: GlobalHotKey!
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -21,11 +22,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ipcServer = IPCServer(store: sessionStore)
         ipcServer.start()
 
+        globalHotKey = GlobalHotKey { [weak self] in
+            self?.sessionStore.toggleExpanded()
+        }
+
         maybeOfferHookInstall()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         ipcServer.stop()
+        globalHotKey = nil
     }
 
     private static let hookInstallDismissedKey = "owl.hookInstallPromptDismissed"
