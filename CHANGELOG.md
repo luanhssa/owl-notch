@@ -10,6 +10,19 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-17
+
+### Added
+
+- A small pulsing dot next to the last-tool summary in a session's
+  expanded detail, shown only while that session is `.running`
+  ([#35](https://github.com/luanhssa/owl-notch/issues/35)) — a static row
+  otherwise looks identical whether Claude is actively working or has
+  silently stalled. Uses its own self-contained looping SwiftUI animation
+  rather than a manual timer, and respects "reduce motion"
+  (`NSWorkspace.accessibilityDisplayShouldReduceMotion`) by staying a
+  plain solid dot instead of animating.
+
 ## [0.6.0] - 2026-08-17
 
 ### Added

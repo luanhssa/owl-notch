@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private func color(for state: SessionState) -> Color {
@@ -50,6 +51,28 @@ struct EnvironmentTagView: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.12)))
+    }
+}
+
+/// A small looping pulse next to the last-tool summary, shown only while a
+/// session is `.running` — a static row otherwise looks identical whether
+/// Claude is actively working or has silently stalled (GH issue #35).
+/// Respects "reduce motion" by just staying a plain solid dot instead.
+private struct PulsingDot: View {
+    let color: Color
+    @State private var isPulsing = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 5, height: 5)
+            .opacity(isPulsing ? 0.3 : 1)
+            .onAppear {
+                guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
     }
 }
 
@@ -114,10 +137,16 @@ struct SessionRowView: View {
                         }
                     }
                     if let summary = session.lastToolSummary {
-                        Text(summary)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .lineLimit(3)
+                        HStack(alignment: .top, spacing: 5) {
+                            if session.state == .running {
+                                PulsingDot(color: color(for: session.state))
+                                    .padding(.top, 3)
+                            }
+                            Text(summary)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .lineLimit(3)
+                        }
                     }
 
                     Button {
