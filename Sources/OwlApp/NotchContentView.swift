@@ -23,17 +23,17 @@ struct NotchPillView: View {
     @ObservedObject var store: SessionStore
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: NotchStyle.pillSpacing) {
             Image(systemName: "bird.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(.system(size: NotchStyle.iconFontSize))
+                .foregroundStyle(.white.opacity(NotchStyle.iconOpacity))
 
             if store.needsAttentionCount > 0 {
                 Circle()
                     .fill(Color.orange)
-                    .frame(width: 7, height: 7)
+                    .frame(width: NotchStyle.attentionDotSize, height: NotchStyle.attentionDotSize)
                 Text("\(store.needsAttentionCount)")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: NotchStyle.badgeFontSize, weight: .semibold))
                     .foregroundStyle(.white)
             }
         }
@@ -50,11 +50,11 @@ struct EnvironmentTagView: View {
 
     var body: some View {
         Text(isTmux ? "\(environment.label)·tmux" : environment.label)
-            .font(.system(size: 8, weight: .semibold, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.7))
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.12)))
+            .font(.system(size: NotchStyle.tagFontSize, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.white.opacity(NotchStyle.secondaryTextOpacity))
+            .padding(.horizontal, NotchStyle.tagHorizontalPadding)
+            .padding(.vertical, NotchStyle.tagVerticalPadding)
+            .background(RoundedRectangle(cornerRadius: NotchStyle.tagCornerRadius).fill(Color.white.opacity(NotchStyle.tagBackgroundOpacity)))
     }
 }
 
@@ -69,11 +69,11 @@ private struct PulsingDot: View {
     var body: some View {
         Circle()
             .fill(color)
-            .frame(width: 5, height: 5)
-            .opacity(isPulsing ? 0.3 : 1)
+            .frame(width: NotchStyle.pulsingDotSize, height: NotchStyle.pulsingDotSize)
+            .opacity(isPulsing ? NotchStyle.pulsingDotDimOpacity : NotchStyle.pulsingDotBrightOpacity)
             .onAppear {
                 guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                withAnimation(.easeInOut(duration: NotchStyle.pulsingAnimationDuration).repeatForever(autoreverses: true)) {
                     isPulsing = true
                 }
             }
@@ -89,45 +89,45 @@ struct SessionRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onToggle) {
-                HStack(spacing: 8) {
+                HStack(spacing: NotchStyle.rowSpacing) {
                     Circle()
                         .fill(color(for: session.state))
-                        .frame(width: 8, height: 8)
+                        .frame(width: NotchStyle.stateDotSize, height: NotchStyle.stateDotSize)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: NotchStyle.titleBlockSpacing) {
                         Text(session.displayTitle)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: NotchStyle.titleFontSize, weight: .semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        HStack(spacing: 6) {
+                        HStack(spacing: NotchStyle.metaRowSpacing) {
                             Text(session.state.label)
-                                .font(.system(size: 10))
+                                .font(.system(size: NotchStyle.bodyFontSize))
                                 .foregroundStyle(color(for: session.state))
                             if let branch = session.gitBranch {
                                 Text("⎇ \(branch)")
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .font(.system(size: NotchStyle.captionFontSize, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                                     .lineLimit(1)
                             }
-                            Spacer(minLength: 4)
+                            Spacer(minLength: NotchStyle.metaRowSpacerMinLength)
                             EnvironmentTagView(environment: session.environment, isTmux: session.tmuxPane != nil)
                         }
                     }
                     Spacer()
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                        .foregroundStyle(.white.opacity(NotchStyle.chevronOpacity))
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, NotchStyle.rowHorizontalPadding)
+                .padding(.vertical, NotchStyle.rowVerticalPadding)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             if isExpanded {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: NotchStyle.detailBlockSpacing) {
                     // Without TimelineView, this label only recomputes when
                     // some unrelated @Published change on `store` happens to
                     // trigger a re-render — it can go stale indefinitely
@@ -135,20 +135,20 @@ struct SessionRowView: View {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         HStack {
                             Text("há \(elapsedLabel(since: session.stateEnteredAt, now: context.date)) nesse estado")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .font(.system(size: NotchStyle.captionFontSize))
+                                .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                             Spacer()
                         }
                     }
                     if let summary = session.lastToolSummary {
-                        HStack(alignment: .top, spacing: 5) {
+                        HStack(alignment: .top, spacing: NotchStyle.toolSummarySpacing) {
                             if session.state == .running {
                                 PulsingDot(color: color(for: session.state))
-                                    .padding(.top, 3)
+                                    .padding(.top, NotchStyle.pulsingDotTopPadding)
                             }
                             Text(summary)
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .font(.system(size: NotchStyle.captionFontSize, design: .monospaced))
+                                .foregroundStyle(.white.opacity(NotchStyle.secondaryTextOpacity))
                                 .lineLimit(3)
                         }
                     }
@@ -157,21 +157,21 @@ struct SessionRowView: View {
                         store.acknowledge(sessionID: session.sessionID)
                         SessionFocusService.activate(for: session)
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: NotchStyle.actionButtonContentSpacing) {
                             Text("Abrir sessão")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: NotchStyle.bodyFontSize, weight: .semibold))
                             Image(systemName: "arrow.up.right")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
                         }
                         .foregroundStyle(.black)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.9)))
+                        .padding(.horizontal, NotchStyle.actionButtonHorizontalPadding)
+                        .padding(.vertical, NotchStyle.actionButtonVerticalPadding)
+                        .background(RoundedRectangle(cornerRadius: NotchStyle.actionButtonCornerRadius).fill(Color.white.opacity(NotchStyle.actionButtonBackgroundOpacity)))
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 8)
+                .padding(.horizontal, NotchStyle.rowHorizontalPadding)
+                .padding(.bottom, NotchStyle.detailBottomPadding)
             }
         }
     }
@@ -202,7 +202,7 @@ struct NotchContentView: View {
                     store.toggleExpanded()
                 } label: {
                     NotchPillView(store: store)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, NotchStyle.pillVerticalPadding)
                 }
                 .buttonStyle(.plain)
 
@@ -210,13 +210,13 @@ struct NotchContentView: View {
                     HStack(spacing: 0) {
                         Button(action: onShowAbout) {
                             Image(systemName: "info.circle")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.6))
-                                .frame(width: 20, height: 20)
+                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                                .foregroundStyle(.white.opacity(NotchStyle.iconButtonOpacity))
+                                .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.leading, max(4, (earWidth - 20) / 2))
+                        .padding(.leading, max(NotchStyle.iconButtonMinimumSidePadding, (earWidth - NotchStyle.iconButtonSize) / 2))
 
                         Spacer()
 
@@ -224,19 +224,19 @@ struct NotchContentView: View {
                             store.dismissAll()
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.6))
-                                .frame(width: 20, height: 20)
+                                .font(.system(size: NotchStyle.captionFontSize, weight: .bold))
+                                .foregroundStyle(.white.opacity(NotchStyle.iconButtonOpacity))
+                                .frame(width: NotchStyle.iconButtonSize, height: NotchStyle.iconButtonSize)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.trailing, max(4, (earWidth - 20) / 2))
+                        .padding(.trailing, max(NotchStyle.iconButtonMinimumSidePadding, (earWidth - NotchStyle.iconButtonSize) / 2))
                     }
                 }
             }
 
             if effectiveExpanded {
-                Divider().background(Color.white.opacity(0.1))
+                Divider().background(Color.white.opacity(NotchStyle.primaryDividerOpacity))
 
                 // Captured once instead of accessed repeatedly below —
                 // `sortedSessions` re-sorts on every access (GH issue #18),
@@ -247,9 +247,9 @@ struct NotchContentView: View {
                 let sessions = store.sortedSessions
                 if sessions.isEmpty {
                     Text("Nenhuma sessão ainda")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.vertical, 14)
+                        .font(.system(size: NotchStyle.emptyStateFontSize))
+                        .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
+                        .padding(.vertical, NotchStyle.emptyStateVerticalPadding)
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
@@ -261,7 +261,7 @@ struct NotchContentView: View {
                                     onToggle: { store.toggleAccordion(sessionID: session.sessionID) }
                                 )
                                 if session.id != sessions.last?.id {
-                                    Divider().background(Color.white.opacity(0.06))
+                                    Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
                                 }
                             }
                         }
@@ -273,8 +273,8 @@ struct NotchContentView: View {
         .background(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: 14,
-                bottomTrailingRadius: 14,
+                bottomLeadingRadius: NotchStyle.panelCornerRadius,
+                bottomTrailingRadius: NotchStyle.panelCornerRadius,
                 topTrailingRadius: 0
             )
             .fill(Color.black)

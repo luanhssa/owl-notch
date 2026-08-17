@@ -10,6 +10,19 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-17
+
+### Changed
+
+- Extracted `NotchContentView`'s styling literals (font sizes, opacities,
+  corner radii, sizes, spacing/padding) into a new `NotchStyle` enum
+  ([#39](https://github.com/luanhssa/owl-notch/issues/39)), mirroring
+  `NotchLayout`'s existing centralization of shared geometry constants.
+  Tokens are grouped by semantic role rather than by call site, so values
+  that mean the same thing in different places (e.g. "muted text opacity")
+  share one token instead of being coincidentally-equal inline literals.
+  Purely mechanical — no visual or behavioral change.
+
 ## [0.10.0] - 2026-08-17
 
 ### Added
