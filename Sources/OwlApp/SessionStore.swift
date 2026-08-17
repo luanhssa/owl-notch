@@ -17,9 +17,18 @@ enum SessionState: String, Codable {
         }
     }
 
-    /// Worth surfacing proactively (auto-expand the notch) — everything
-    /// except the plain "still working" state.
-    var isNotable: Bool { self != .running }
+    /// Worth surfacing proactively (auto-expand the notch, count toward the
+    /// urgent badge). `.done` is gated behind the "notify on finish"
+    /// preference (GH issue #34) since, unlike the other two, it isn't
+    /// Claude actually waiting on the user — everything else, running
+    /// aside, always counts.
+    static func isNotable(_ state: SessionState, notifyOnSessionDone: Bool) -> Bool {
+        switch state {
+        case .running: return false
+        case .done: return notifyOnSessionDone
+        case .needsAttention, .needsApproval: return true
+        }
+    }
 }
 
 enum SessionEnvironment: String, Codable {
@@ -87,8 +96,11 @@ final class SessionStore: ObservableObject {
     @Published var notchWidth: CGFloat = 180
 
     /// Sessions with no new event in this long are dropped — a session that
-    /// went quiet half a day ago has no "click to jump back" value left.
-    private static let staleAfter: TimeInterval = 12 * 60 * 60
+    /// went quiet has no "click to jump back" value left. User-configurable
+    /// (GH issue #34, phase 1); defaults to 12h.
+    private var staleAfter: TimeInterval {
+        Preferences.staleSessionCutoffHours(defaults: defaults) * 60 * 60
+    }
 
     /// Independent of the time-based prune above, which by definition can't
     /// remove anything less than `staleAfter` old — this bounds worst-case
@@ -116,6 +128,11 @@ final class SessionStore: ObservableObject {
     /// default preserves production behavior exactly.
     private let persistenceURL: URL
 
+    /// Injectable so tests never read or write the real `UserDefaults`
+    /// domain when exercising preference-dependent behavior (stale cutoff,
+    /// notify-on-done) — mirrors `persistenceURL` above.
+    private let defaults: UserDefaults
+
     /// The frontmost application's bundle identifier, kept live so a
     /// session whose own app (terminal, or Claude Desktop) is already in
     /// the foreground can stop flagging as "needs attention" — the user is
@@ -125,8 +142,12 @@ final class SessionStore: ObservableObject {
     @Published private(set) var frontmostBundleIdentifier: String?
     private var frontmostAppObserver: NSObjectProtocol?
 
-    init(persistenceURL: URL = OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json")) {
+    init(
+        persistenceURL: URL = OwlPaths.applicationSupportDirectory.appendingPathComponent("Owl/sessions.json"),
+        defaults: UserDefaults = .standard
+    ) {
         self.persistenceURL = persistenceURL
+        self.defaults = defaults
         loadPersistedSessions()
         pruneTimer = Timer.scheduledTimer(withTimeInterval: Self.pruneInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pruneStaleSessions() }
@@ -166,7 +187,7 @@ final class SessionStore: ObservableObject {
             let decoded = try? JSONDecoder().decode([SessionInfo].self, from: data)
         else { return }
 
-        let cutoff = Date().addingTimeInterval(-Self.staleAfter)
+        let cutoff = Date().addingTimeInterval(-staleAfter)
         for info in decoded where info.lastEventAt > cutoff {
             sessions[info.sessionID] = info
         }
@@ -199,7 +220,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func persistSessions() {
-        let cutoff = Date().addingTimeInterval(-Self.staleAfter)
+        let cutoff = Date().addingTimeInterval(-staleAfter)
         let toSave = sessions.values.filter { $0.lastEventAt > cutoff }
         guard let data = try? JSONEncoder().encode(Array(toSave)) else {
             NSLog("Owl: failed to encode sessions for persistence")
@@ -220,7 +241,7 @@ final class SessionStore: ObservableObject {
     /// not just from what gets persisted — otherwise a long-running Owl
     /// process would keep showing them until its next relaunch.
     private func pruneStaleSessions() {
-        let cutoff = Date().addingTimeInterval(-Self.staleAfter)
+        let cutoff = Date().addingTimeInterval(-staleAfter)
         let staleIDs = sessions.filter { $0.value.lastEventAt <= cutoff }.map(\.key)
         guard !staleIDs.isEmpty else { return }
         for id in staleIDs { sessions.removeValue(forKey: id) }
@@ -277,7 +298,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func isUrgent(_ session: SessionInfo) -> Bool {
-        session.state.isNotable
+        SessionState.isNotable(session.state, notifyOnSessionDone: Preferences.notifyOnSessionDone(defaults: defaults))
             && !session.acknowledged
             && !Self.isForeground(frontmostBundleIdentifier: frontmostBundleIdentifier, session: session)
     }
@@ -354,7 +375,8 @@ final class SessionStore: ObservableObject {
         // case above (e.g. a stray PreToolUse after `.done`) must NOT do
         // this, or "Abrir sessão" would never stick for those.
         let isFreshNotification = envelope.eventType == "notification"
-        if newState.isNotable && (stateChanged || isFreshNotification) {
+        if SessionState.isNotable(newState, notifyOnSessionDone: Preferences.notifyOnSessionDone(defaults: defaults))
+            && (stateChanged || isFreshNotification) {
             info.acknowledged = false
         }
         info.lastEventAt = Date()

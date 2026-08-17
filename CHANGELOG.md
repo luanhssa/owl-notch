@@ -10,6 +10,30 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-17
+
+### Added
+
+- A Preferences window ([#34](https://github.com/luanhssa/owl-notch/issues/34)),
+  opened from a new button in the About panel, exposing three settings
+  that were previously either hardcoded or invisible:
+  - **Stale-session cutoff** — how long a session with no new hook event
+    stays tracked before being dropped (`SessionStore.staleAfter` was a
+    fixed 12h; now a 1–48h slider, backed by `UserDefaults`).
+  - **Notify on session finish** — whether a `.done` session counts
+    toward the urgent badge/auto-expand. The two states meaning "Claude
+    is actually blocked on you" (`needsAttention`/`needsApproval`) stay
+    always-notable and non-optional by design — same "don't let the
+    notch grow needless configurability" reasoning as the
+    [#48](https://github.com/luanhssa/owl-notch/issues/48) decision;
+    only "it finished" is a matter of taste.
+  - **Open at login** — a real toggle over Owl's existing silent/automatic
+    `SMAppService` registration (new `LoginItemService` wrapper), instead
+    of a one-way action with no way to see or undo it from the UI.
+  - 10 new tests (`PreferencesTests`, plus `SessionStoreTests` additions)
+    covering defaults, round-tripping, range clamping, and that the
+    notify-on-finish toggle only gates `.done`.
+
 ## [0.10.1] - 2026-08-17
 
 ### Changed

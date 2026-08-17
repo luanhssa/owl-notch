@@ -22,7 +22,10 @@ permission decision, and fails open — if Owl isn't running or doesn't
 respond within ~250ms, Claude Code behaves exactly as if Owl didn't exist.
 
 Click the pill to expand it, or press **⌥⌘O** from anywhere to toggle it
-open/closed on demand, even if Owl isn't the frontmost app.
+open/closed on demand, even if Owl isn't the frontmost app. The small
+info button in the expanded header opens an About panel with a link to
+Preferences — the stale-session cutoff, whether a finished session counts
+as urgent, and the "open at login" toggle.
 
 ## How it works
 

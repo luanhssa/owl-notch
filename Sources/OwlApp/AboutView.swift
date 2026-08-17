@@ -7,6 +7,7 @@ import SwiftUI
 /// header (see `NotchContentView`).
 struct AboutView: View {
     @ObservedObject var store: SessionStore
+    let onShowPreferences: () -> Void
     @State private var showResetConfirmation = false
 
     private var versionString: String {
@@ -28,6 +29,14 @@ struct AboutView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Preferências")
+                    .font(.headline)
+                Button("Abrir Preferências", action: onShowPreferences)
             }
 
             Divider()

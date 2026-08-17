@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import Combine
-import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -9,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var ipcServer: IPCServer!
     private var panel: NSPanel!
     private var aboutWindow: NSWindow?
+    private var preferencesWindow: NSWindow?
     private var globalHotKey: GlobalHotKey!
     private var cancellables = Set<AnyCancellable>()
 
@@ -71,19 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Only meaningful once Owl runs from a real .app bundle (see
-    /// Scripts/build-app-bundle.sh) — SMAppService needs a proper bundle
-    /// identifier. Running the bare SwiftPM binary during development is a
-    /// harmless no-op here.
+    /// Opts Owl into "open at login" on first launch — see
+    /// `LoginItemService` for the underlying `SMAppService` wrapper, which
+    /// the Preferences window (GH issue #34) also uses to show/toggle this
+    /// afterward.
     private func registerLoginItemIfNeeded() {
-        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
-        let service = SMAppService.mainApp
-        guard service.status != .enabled else { return }
-        do {
-            try service.register()
-        } catch {
-            NSLog("Owl: login item registration failed (status was \(service.status.rawValue)): \(error)")
-        }
+        guard LoginItemService.isAvailable, !LoginItemService.isEnabled else { return }
+        LoginItemService.setEnabled(true)
     }
 
     private func setupPanel() {
@@ -117,7 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// only other UI surface it has (GH issue #37).
     private func showAboutWindow() {
         if aboutWindow == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: AboutView(store: sessionStore)))
+            let view = AboutView(store: sessionStore, onShowPreferences: { [weak self] in
+                self?.showPreferencesWindow()
+            })
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Sobre o Owl"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
@@ -126,6 +123,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         aboutWindow?.center()
         aboutWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Opened from a button in the About panel (GH issue #34) — exposes the
+    /// stale-session cutoff, the notify-on-finish toggle, and the login-item
+    /// toggle, all previously either hardcoded or invisible.
+    private func showPreferencesWindow() {
+        if preferencesWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: PreferencesView()))
+            window.title = "Preferências"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            preferencesWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        preferencesWindow?.center()
+        preferencesWindow?.makeKeyAndOrderFront(nil)
     }
 
     /// Real notch dimensions from the safe-area/auxiliary-area APIs — the

@@ -4,18 +4,25 @@ import XCTest
 @MainActor
 final class SessionStoreTests: XCTestCase {
     private var tempURL: URL!
+    private var defaultsSuiteName: String!
+    private var defaults: UserDefaults!
     private var store: SessionStore!
 
     override func setUp() {
         super.setUp()
         tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("owl-test-\(UUID().uuidString).json")
-        store = SessionStore(persistenceURL: tempURL)
+        defaultsSuiteName = "owl-test-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
+        store = SessionStore(persistenceURL: tempURL, defaults: defaults)
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempURL)
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
         store = nil
         tempURL = nil
+        defaults = nil
+        defaultsSuiteName = nil
         super.tearDown()
     }
 
@@ -186,5 +193,47 @@ final class SessionStoreTests: XCTestCase {
         store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "urgent"))
 
         XCTAssertEqual(store.sortedSessions.first?.sessionID, "urgent")
+    }
+
+    // MARK: - Configurable preferences (GH issue #34)
+
+    func testDoneSessionCountsAsUrgentByDefault() {
+        store.handle(envelope: makeEnvelope(eventType: "stop", sessionID: "s1"))
+        XCTAssertEqual(store.needsAttentionCount, 1)
+    }
+
+    func testDoneSessionDoesNotCountAsUrgentWhenNotifyOnSessionDoneIsDisabled() {
+        Preferences.setNotifyOnSessionDone(false, defaults: defaults)
+
+        store.handle(envelope: makeEnvelope(eventType: "stop", sessionID: "s1"))
+        XCTAssertEqual(store.needsAttentionCount, 0)
+    }
+
+    func testNeedsAttentionStillCountsAsUrgentWhenNotifyOnSessionDoneIsDisabled() {
+        Preferences.setNotifyOnSessionDone(false, defaults: defaults)
+
+        store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s1"))
+        XCTAssertEqual(store.needsAttentionCount, 1, "notifyOnSessionDone only gates .done, not needsAttention/needsApproval")
+    }
+
+    func testPersistedSessionRespectsConfiguredStaleCutoff() throws {
+        Preferences.setStaleSessionCutoffHours(1, defaults: defaults)
+
+        let oldSession = SessionInfo(
+            sessionID: "old",
+            title: nil,
+            projectName: "p",
+            cwd: "/tmp",
+            gitBranch: nil,
+            environment: .cli,
+            state: .done,
+            stateEnteredAt: Date().addingTimeInterval(-2 * 60 * 60),
+            lastEventAt: Date().addingTimeInterval(-2 * 60 * 60)
+        )
+        let data = try JSONEncoder().encode([oldSession])
+        try data.write(to: tempURL)
+
+        let reloaded = SessionStore(persistenceURL: tempURL, defaults: defaults)
+        XCTAssertNil(reloaded.sessions["old"], "a 1h cutoff should drop a session 2h old")
     }
 }
