@@ -146,6 +146,10 @@ struct SessionRowView: View {
 
 struct NotchContentView: View {
     @ObservedObject var store: SessionStore
+    /// Opens the About/Troubleshooting window (GH issue #37) — Owl has no
+    /// Dock icon or menu bar item, so this button in the expanded header is
+    /// the only way to reach it.
+    let onShowAbout: () -> Void
 
     private var effectiveExpanded: Bool {
         store.isExpanded || store.needsAttentionCount > 0
@@ -171,7 +175,18 @@ struct NotchContentView: View {
 
                 if effectiveExpanded {
                     HStack(spacing: 0) {
+                        Button(action: onShowAbout) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .frame(width: 20, height: 20)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, max(4, (earWidth - 20) / 2))
+
                         Spacer()
+
                         Button {
                             store.dismissAll()
                         } label: {

@@ -10,6 +10,28 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-17
+
+### Added
+
+- A minimal About/Troubleshooting window (GH issue #37): app version, an
+  "Abrir Console" button, and a confirmed "reset all sessions" action.
+  Reachable from a small info-circle button in the notch's expanded
+  header — Owl has no Dock icon or menu bar item, so this is its only
+  other UI surface.
+- `SessionStore.resetAllSessions()` — clears every tracked session at once,
+  for when state gets stuck and a full app restart isn't convenient.
+
+### Changed
+
+- The panel opens Console.app rather than a specific log file: Owl's
+  production code logs via `NSLog` into the unified system log, not a
+  plain text file — `owl.log` is written only by the standalone
+  `OwlServer` reference target (kept for historical/reference purposes),
+  never by the real app. The original issue assumed a log file existed;
+  it doesn't, so pointing at Console.app is the honest version of "view
+  logs" rather than a button that opens nothing.
+
 ## [0.4.0] - 2026-08-16
 
 ### Added

@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let sessionStore = SessionStore()
     private var ipcServer: IPCServer!
     private var panel: NSPanel!
+    private var aboutWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -57,11 +58,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
-        let hosting = NSHostingView(rootView: NotchContentView(store: sessionStore))
+        let hosting = NSHostingView(rootView: NotchContentView(store: sessionStore, onShowAbout: { [weak self] in
+            self?.showAboutWindow()
+        }))
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         panel.contentView = hosting
 
         panel.orderFrontRegardless()
+    }
+
+    /// Owl has no Dock icon and no menu bar item — this small, regular
+    /// window (opened from a button in the notch's expanded header) is the
+    /// only other UI surface it has (GH issue #37).
+    private func showAboutWindow() {
+        if aboutWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: AboutView(store: sessionStore)))
+            window.title = "Sobre o Owl"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            aboutWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        aboutWindow?.center()
+        aboutWindow?.makeKeyAndOrderFront(nil)
     }
 
     /// Real notch dimensions from the safe-area/auxiliary-area APIs — the

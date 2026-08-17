@@ -255,6 +255,17 @@ final class SessionStore: ObservableObject {
         schedulePersist()
     }
 
+    /// Called from the About/Troubleshooting panel's "reset all sessions"
+    /// action (GH issue #37) — for when state gets into a confusing/stuck
+    /// condition and quitting Owl plus deleting its Application Support
+    /// files by hand isn't convenient. Unlike `dismissAll()`, this drops
+    /// every session outright, not just the finished ones.
+    func resetAllSessions() {
+        sessions = [:]
+        isExpanded = false
+        schedulePersist()
+    }
+
     private func isUrgent(_ session: SessionInfo) -> Bool {
         session.state.isNotable
             && !session.acknowledged
