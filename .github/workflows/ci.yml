@@ -1,3 +1,10 @@
+# Validation only — neither job here tags, publishes, or creates a
+# GitHub Release. They just run `swift test`/`swift build -c release`
+# against whatever ref triggered the workflow (a PR's own branch, or
+# main after a merge) to catch build/test failures before merge.
+# Versioning (bumping Resources/Info.plist, `git tag`, pushing the tag)
+# is a manual step performed only on `main` after a PR is merged — it
+# never happens here, and never from an unmerged PR branch.
 name: CI
 
 on:
@@ -17,7 +24,9 @@ jobs:
         run: swift test
 
   build-release:
-    name: Build (release)
+    # Named for the build *configuration* (Release, i.e. optimized) this
+    # job compiles with — not a signal that anything is being shipped.
+    name: Build (Release configuration)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
