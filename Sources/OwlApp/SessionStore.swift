@@ -492,15 +492,66 @@ final class SessionStore: ObservableObject {
         if let sidebarTitle = SidebarTitleService.title(forCliSessionID: sessionID) {
             info.title = sidebarTitle
         } else if info.title == nil {
-            info.title = SessionTitleService.deriveTitle(transcriptPath: input.transcriptPath)
+            kickOffTitleLookupIfNeeded(sessionID: sessionID, transcriptPath: input.transcriptPath)
         }
         if info.gitBranch == nil {
-            info.gitBranch = GitInfoService.branch(forCwd: cwd)
+            kickOffGitBranchLookupIfNeeded(sessionID: sessionID, cwd: cwd)
         }
 
         sessions[sessionID] = info
         enforceSessionCap()
         schedulePersist()
+    }
+
+    /// Sessions with a title/branch lookup currently running on a
+    /// background `Task` — guards against a burst of hook events for the
+    /// same session (e.g. several `PreToolUse` calls in a row) each
+    /// kicking off its own redundant transcript read/directory walk
+    /// before the first one resolves (GH issue #24).
+    private var pendingTitleLookups: Set<String> = []
+    private var pendingGitBranchLookups: Set<String> = []
+
+    /// Moves `SessionTitleService`'s transcript read off the main actor
+    /// (GH issue #24, phase 3) — `SidebarTitleService`'s own tree scan was
+    /// already off the main actor from the #1 fix, `SessionTitleService`
+    /// itself is thread-safe (see its own `NSLock`-guarded cache), so all
+    /// that's needed here is running the call on a background `Task` and
+    /// hopping back to `@MainActor` only to assign the result — re-reading
+    /// `sessions[sessionID]` fresh at that point, not the `info` captured
+    /// above, since other synchronous `handle(envelope:)` calls for this
+    /// session may have run to completion while this was in flight.
+    private func kickOffTitleLookupIfNeeded(sessionID: String, transcriptPath: String?) {
+        guard !pendingTitleLookups.contains(sessionID) else { return }
+        pendingTitleLookups.insert(sessionID)
+        Task.detached { [weak self] in
+            let title = SessionTitleService.deriveTitle(transcriptPath: transcriptPath)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                pendingTitleLookups.remove(sessionID)
+                guard let title, var info = sessions[sessionID], info.title == nil else { return }
+                info.title = title
+                sessions[sessionID] = info
+                schedulePersist()
+            }
+        }
+    }
+
+    /// Same as `kickOffTitleLookupIfNeeded` above, for `GitInfoService`'s
+    /// directory walk (GH issue #24, phase 2).
+    private func kickOffGitBranchLookupIfNeeded(sessionID: String, cwd: String) {
+        guard !pendingGitBranchLookups.contains(sessionID) else { return }
+        pendingGitBranchLookups.insert(sessionID)
+        Task.detached { [weak self] in
+            let branch = GitInfoService.branch(forCwd: cwd)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                pendingGitBranchLookups.remove(sessionID)
+                guard let branch, var info = sessions[sessionID], info.gitBranch == nil else { return }
+                info.gitBranch = branch
+                sessions[sessionID] = info
+                schedulePersist()
+            }
+        }
     }
 
     private static func projectName(fromCwd cwd: String) -> String {

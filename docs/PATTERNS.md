@@ -153,3 +153,27 @@ resetting internal cache state from outside. `ProcessAncestry` is the
 exception — its live `sysctl`-based walk genuinely can't be exercised this
 way, so its name-matching logic was extracted into a pure, plain-array-in
 function (`classify(ancestorProcessNames:)`) instead.
+
+## 16. Deferred lookups hop off `@MainActor`, then back only to assign — never `await` inline mid-mutation
+
+`SessionStore.handle(envelope:)` builds and commits a `SessionInfo` update
+synchronously, in one uninterrupted pass — it never contains an `await`.
+That's deliberate: `handle(envelope:)` runs on `@MainActor`, and an actor
+method is *reentrant* across its own suspension points, so a plain
+`await GitInfoService.branch(...)` sitting inline, midway through building
+`info`, would let another `handle(envelope:)` call for the very same
+session run to completion during that suspension — and then this call's
+eventual `sessions[sessionID] = info` would silently overwrite that newer
+state with the stale copy it captured before the `await` (GH issue #24).
+
+The fix — see `kickOffGitBranchLookupIfNeeded`/`kickOffTitleLookupIfNeeded`
+— is to keep the triggering method fully synchronous, and instead spawn a
+detached `Task` for the actual filesystem work, hopping back to
+`@MainActor` only in its completion handler, where it re-reads
+`sessions[sessionID]` fresh (not the `info` from the original call) before
+writing the resolved field. A `Set<String>` of in-flight session IDs per
+lookup kind guards against a burst of hook events for one session (e.g.
+several `PreToolUse` calls in a row) each kicking off a redundant lookup
+before the first resolves. Follow this shape for any future lookup that
+needs to move off the main actor: never `await` inside a method that also
+mutates shared actor state before and after the suspension point.

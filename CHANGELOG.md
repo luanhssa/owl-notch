@@ -10,6 +10,28 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-17
+
+### Changed
+
+- Moved `GitInfoService`'s directory walk and `SessionTitleService`'s
+  transcript read off the main actor
+  ([#24](https://github.com/luanhssa/owl-notch/issues/24)) — both used to
+  run inline inside `SessionStore.handle(envelope:)`, blocking every hook
+  event on disk I/O for however long a cache miss took. `SidebarTitleService`'s
+  tree scan (the issue's first phase) was already off the main actor from
+  the [#1](https://github.com/luanhssa/owl-notch/issues/1) fix.
+  `handle(envelope:)` itself stays fully synchronous — no inline `await` —
+  since an actor method is reentrant across suspension points; an `await`
+  sitting mid-mutation would let another call for the same session
+  interleave and get silently overwritten. Instead, each lookup spawns a
+  detached `Task` and hops back to `@MainActor` only to assign the
+  resolved value, re-reading the session fresh at that point rather than
+  a copy captured before the hop. Documented as pattern #16 in
+  `docs/PATTERNS.md`. 2 new async convergence tests; all 79 pass. Purely
+  an internal refactor — no observable behavior change beyond the title/
+  branch appearing a beat later on a cold cache instead of blocking for it.
+
 ## [0.13.0] - 2026-08-17
 
 ### Added

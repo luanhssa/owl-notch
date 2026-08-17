@@ -315,6 +315,43 @@ final class SessionStoreTests: XCTestCase {
         ))
     }
 
+    // MARK: - Off-main-actor git branch / title lookups (GH issue #24)
+
+    func testGitBranchLookupResolvesAsynchronouslyWithoutBlockingHandle() async throws {
+        let repoCwd = FileManager.default.temporaryDirectory.appendingPathComponent("owl-async-git-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: repoCwd.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        try "ref: refs/heads/async-branch\n".write(to: repoCwd.appendingPathComponent(".git/HEAD"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: repoCwd) }
+
+        store.handle(envelope: makeEnvelope(eventType: "notification", sessionID: "s1", cwd: repoCwd.path))
+        XCTAssertNil(store.sessions["s1"]?.gitBranch, "the lookup runs on a background Task, not inline")
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.sessions["s1"]?.gitBranch == nil, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(store.sessions["s1"]?.gitBranch, "async-branch")
+    }
+
+    func testTitleLookupResolvesAsynchronouslyWithoutBlockingHandle() async throws {
+        let transcriptPath = FileManager.default.temporaryDirectory.appendingPathComponent("owl-async-title-test-\(UUID().uuidString).jsonl").path
+        let line = "{\"type\":\"user\",\"message\":{\"content\":\"Fix the async lookup\"}}\n"
+        try line.write(toFile: transcriptPath, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: transcriptPath) }
+
+        let hookInput: [String: Any] = ["session_id": "s1", "cwd": "/tmp", "transcript_path": transcriptPath]
+        let json: [String: Any] = ["event_type": "notification", "hook_input": hookInput, "environment": "cli"]
+        let data = try JSONSerialization.data(withJSONObject: json)
+        store.handle(envelope: HookEnvelope(data: data)!)
+        XCTAssertNil(store.sessions["s1"]?.title, "the lookup runs on a background Task, not inline")
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.sessions["s1"]?.title == nil, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(store.sessions["s1"]?.title, "Fix the async lookup")
+    }
+
     func testPersistedSessionRespectsConfiguredStaleCutoff() throws {
         Preferences.setStaleSessionCutoffHours(1, defaults: defaults)
 
