@@ -114,6 +114,11 @@ final class SessionStore: ObservableObject {
     /// AppDelegate — lets the SwiftUI content know how much of the expanded
     /// panel's width is "ear" (outside the real notch) versus centered over it.
     @Published var notchWidth: CGFloat = 180
+    /// Height of the physical notch cutout, kept in sync by AppDelegate
+    /// alongside `notchWidth` — the collapsed header sizes itself to this
+    /// so its clickable area covers the whole notch instead of just the
+    /// glyph drawn inside it.
+    @Published var notchHeight: CGFloat = 34
 
     /// The time until which *every* session's urgent-highlight/auto-expand
     /// is suppressed — the global half of the focus-time snooze (GH issue
