@@ -43,9 +43,13 @@ struct NotchPillView: View {
 
 struct EnvironmentTagView: View {
     let environment: SessionEnvironment
+    /// Appends "·tmux" when the session is running inside a tmux pane (GH
+    /// issue #41, phase 1) — detection and display only for now; "jump to
+    /// session" doesn't yet target the specific pane.
+    var isTmux: Bool = false
 
     var body: some View {
-        Text(environment.label)
+        Text(isTmux ? "\(environment.label)·tmux" : environment.label)
             .font(.system(size: 8, weight: .semibold, design: .monospaced))
             .foregroundStyle(.white.opacity(0.7))
             .padding(.horizontal, 5)
@@ -107,7 +111,7 @@ struct SessionRowView: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: 4)
-                            EnvironmentTagView(environment: session.environment)
+                            EnvironmentTagView(environment: session.environment, isTmux: session.tmuxPane != nil)
                         }
                     }
                     Spacer()

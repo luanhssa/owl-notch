@@ -31,6 +31,7 @@ func exitAllow() -> Never {
 // to connectTimeoutMs (GH issue #14).
 let ancestry = ProcessAncestry.classify()
 let terminalTTY = ControllingTerminal.ttyPath()
+let tmuxPane = TmuxInfo.currentPaneID()
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 
@@ -103,6 +104,9 @@ if let terminalApp = ancestry.terminalApp {
 }
 if let terminalTTY {
     envelope["tty"] = terminalTTY
+}
+if let tmuxPane {
+    envelope["tmux_pane"] = tmuxPane
 }
 
 guard let outData = try? JSONSerialization.data(withJSONObject: envelope) else {

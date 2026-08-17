@@ -56,6 +56,11 @@ struct SessionInfo: Identifiable, Codable {
     /// (GH issue #31). `nil` if owl-hook had no controlling terminal, or
     /// for a `.code`/`.cowork` session where it's not meaningful.
     var terminalTTY: String?
+    /// tmux's own pane id (e.g. `%12`) if this session is running inside a
+    /// tmux pane (GH issue #41, phase 1). Only detection + display so far —
+    /// resolving/targeting the specific pane from `SessionFocusService`
+    /// isn't implemented yet.
+    var tmuxPane: String?
     /// True once the user has jumped to this session via "Abrir sessão" —
     /// clears its urgent-highlight until it becomes notable again.
     var acknowledged: Bool = false
@@ -357,6 +362,7 @@ final class SessionStore: ObservableObject {
         info.lastToolSummary = Self.summary(for: input)
         info.terminalApp = envelope.terminalApp ?? info.terminalApp
         info.terminalTTY = envelope.terminalTTY ?? info.terminalTTY
+        info.tmuxPane = envelope.tmuxPane ?? info.tmuxPane
         if let env = SessionEnvironment(rawValue: envelope.environment) {
             info.environment = env
         }

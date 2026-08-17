@@ -10,6 +10,29 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-17
+
+### Added
+
+- Phase 1 of tmux-aware session targeting
+  ([#41](https://github.com/luanhssa/owl-notch/issues/41)): `owl-hook`
+  reads `TMUX_PANE` from its own environment (which tmux sets on every
+  process running inside a pane — no need to shell out to the `tmux`
+  binary for this much) and forwards it in the envelope. A session running
+  inside tmux now shows a `·tmux` suffix on its environment tag instead of
+  looking identical to a plain terminal session. 4 new tests for the
+  (fully mockable) pane-id detection.
+
+### Not done yet
+
+- Phase 2 — resolving and targeting the *specific* tmux pane from
+  `SessionFocusService` when "jump to session" is clicked — is **not**
+  implemented. It needs to shell out to the `tmux` binary and
+  cross-reference client ttys against #31's tab-targeting, and there's no
+  tmux install on the machine this was written on to verify any of that
+  against a real session. Left as a tracked follow-up on #41 rather than
+  shipped unverified.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added
