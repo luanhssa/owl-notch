@@ -308,4 +308,81 @@ final class TokenUsageServiceTests: XCTestCase {
         let snapshot = TokenUsageService.scan(projectsRoot: missing, now: referenceNow)
         XCTAssertEqual(snapshot, .zero)
     }
+
+    // MARK: - Per-file cache (found during #49's review — the original
+    // re-read and re-parsed every transcript on every scan, unbounded cost
+    // that only grew with total history)
+
+    /// A file's mtime naturally advances on a real rewrite, so a second
+    /// scan must pick up the new content rather than serving a stale
+    /// cached result forever.
+    func testScanPicksUpChangesWhenAFileIsActuallyModified() throws {
+        let path = "project-a/session-1.jsonl"
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow), inputTokens: 10, outputTokens: 0)], to: path)
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        try writeTranscript(
+            [
+                assistantLine(timestamp: iso(referenceNow), inputTokens: 10, outputTokens: 0),
+                assistantLine(timestamp: iso(referenceNow), inputTokens: 90, outputTokens: 0),
+            ],
+            to: path
+        )
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 100, "the appended second turn must be picked up, not served from a stale cache")
+    }
+
+    /// Directly demonstrates the cache is actually consulted (not just
+    /// "always correct because it always re-reads"): overwriting a file's
+    /// content but resetting its mtime/size back to what they were before
+    /// must still return the cached (pre-overwrite) result. Uses the same
+    /// `URL.resourceValues`/`setResourceValues` API family throughout
+    /// (rather than mixing in `FileManager.attributesOfItem`) so there's
+    /// no cross-API precision mismatch in the round-tripped date.
+    func testScanServesCachedResultWhenMtimeAndSizeAreUnchanged() throws {
+        let path = "project-a/session-1.jsonl"
+        var url = root.appendingPathComponent(path)
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow), inputTokens: 10, outputTokens: 0)], to: path)
+        let originalValues = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        // Same byte length (same padding), different token count, then
+        // restore the original mtime so the cache key looks unchanged.
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow), inputTokens: 99, outputTokens: 0)], to: path)
+        let rewrittenValues = try url.resourceValues(forKeys: [.fileSizeKey])
+        try XCTSkipUnless(
+            rewrittenValues.fileSize == originalValues.fileSize,
+            "this fixture pair must be byte-identical in length for the cache key to look unchanged"
+        )
+        var restore = URLResourceValues()
+        restore.contentModificationDate = originalValues.contentModificationDate
+        try url.setResourceValues(restore)
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 10, "an unchanged (mtime, size) key should serve the cached result, not the file's real current content")
+    }
+
+    /// A line missing `message.id`/`requestId` still gets *some* dedup key
+    /// (a timestamp+model+tokens fallback) instead of skipping dedup
+    /// entirely — found during #49's review as a gap for exactly the
+    /// malformed/atypical lines where duplication is most likely.
+    func testDedupFallbackCatchesExactRepeatsMissingIDFields() throws {
+        let json: [String: Any] = [
+            "type": "assistant",
+            "timestamp": iso(referenceNow),
+            "message": ["usage": ["input_tokens": 50, "output_tokens": 0]],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: json)
+        let line = String(data: data, encoding: .utf8)!
+
+        try writeTranscript([line], to: "project-a/session-1.jsonl")
+        try writeTranscript([line], to: "project-a/session-1-resumed.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 50, "an exact repeat with no id/requestId should still be deduplicated via the fallback key")
+    }
 }

@@ -14,4 +14,11 @@ enum NotchLayout {
     /// it's a flat constant rather than something computed per render like
     /// `collapsedRowHeight`.
     static let tokenUsageRowHeight: CGFloat = 52
+    /// A plain SwiftUI `Divider()`'s rendered thickness — kept as a named
+    /// constant so `App.swift`'s AppKit-side height calculation can
+    /// account for the dividers that sit outside the scrollable session
+    /// list (the header divider, and the two bracketing the usage row);
+    /// omitting them left the computed panel frame a few points shorter
+    /// than the real SwiftUI content (found during #49's review).
+    static let dividerHeight: CGFloat = 1
 }

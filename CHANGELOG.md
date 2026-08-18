@@ -74,12 +74,20 @@ semver's own rule for pre-1.0 releases.
 - `Preferences`' two budget accessors and `PreferencesView`'s two slider
   rows were near-identical copies of each other; factored into one
   generic clamped-int accessor and one reusable slider row view.
-- `expandedContentHeight()` now accounts for the divider around the
-  token-usage row, closing the ~1pt panel-height gap the original PR
-  introduced (and the pre-existing gap around the header/session-list
-  dividers, per code review during #49).
-- All 17 of #49's original tests pass unchanged; new tests added for the
-  cache, the concurrency guard, and the dedup fallback.
+- `expandedContentHeight()` now accounts for the header divider and the
+  two bracketing the usage row (a `NotchLayout.dividerHeight` constant),
+  closing a small panel-height gap flagged both by code review and by
+  @luanhssa directly on the PR.
+- The panel no longer animates a resize every ~30s for no visual
+  change — `tokenUsageStore.$snapshot` republishes on every scan
+  regardless of whether the numbers actually changed, and the computed
+  frame doesn't depend on its value at all; `observeStore()` now applies
+  `.removeDuplicates()` before combining it in.
+- All 17 of #49's original tests pass unchanged; 8 new ones cover the
+  cache (a real content change is picked up; an unchanged file serves
+  the cached result even if its content is rewritten out from under it),
+  the dedup fallback, and `TokenUsageStore`'s injected-seam/lifecycle
+  behavior. 144 tests pass in total.
 
 ## [0.17.0] - 2026-08-18
 
