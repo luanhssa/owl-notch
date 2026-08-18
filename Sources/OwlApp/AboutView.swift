@@ -64,6 +64,19 @@ struct AboutView: View {
                     showResetConfirmation = true
                 }
             }
+
+            Divider()
+
+            // Owl runs as an accessory app: no Dock icon, no menu bar
+            // item, and no main menu for ⌘Q to hang off — which left
+            // Activity Monitor or `pkill` as the only ways to stop it.
+            // This is the app's only quit affordance.
+            HStack {
+                Button("Encerrar o Owl") {
+                    NSApp.terminate(nil)
+                }
+                Spacer()
+            }
         }
         .padding(20)
         .frame(width: 320)

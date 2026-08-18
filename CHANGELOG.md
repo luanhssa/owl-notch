@@ -10,6 +10,85 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-18
+
+### Added
+
+- Token-usage bars in the expanded notch ([#42](https://github.com/luanhssa/owl-notch/issues/42),
+  partial — cost and context-window percentage are still open), laid out
+  like Claude Code's own `/usage` panel: one row per limit, each with its
+  name, when it resets, the percentage consumed, and a bar underneath.
+  Two limits are shown — the current 5-hour window and the calendar week.
+  Contributed by [@cristovaoltfarias](https://github.com/cristovaoltfarias)
+  in [#49](https://github.com/luanhssa/owl-notch/pull/49), reworked before
+  merging to fix the issues below.
+
+  Computed by `TokenUsageService` reading the same transcript JSONL files
+  under `~/.claude/projects` that Claude Code itself writes (there's no
+  API for this), deduplicated by `message.id`/`requestId` so resumed or
+  compacted sessions don't double-count a turn, and grouped into 5-hour
+  windows anchored to the top of the hour the way Claude Code's own usage
+  reporting does. Refreshed every 30s in the background via
+  `TokenUsageStore`, an `ObservableObject` that never blocks the main
+  actor while scanning.
+
+  The weekly row is the *calendar* week in your locale: Claude Code's
+  weekly limit resets on a per-account schedule that isn't recorded in
+  the transcripts, so Owl can't mirror its exact reset instant.
+- "Limite da janela de 5h" and "Limite semanal" settings in Preferences,
+  the ceilings the bars fill against. Claude Code doesn't expose your
+  plan's allowances anywhere Owl can read, so these are numbers you set —
+  they default to 120M and 400M tokens.
+- An "Encerrar o Owl" button in the About panel. Owl runs as an accessory
+  app — no Dock icon, no menu bar item, and no main menu for ⌘Q to hang
+  off — so until now Activity Monitor or `pkill` were the only ways to
+  stop it.
+
+### Fixed
+
+- The collapsed notch is now clickable across its whole area. A `.plain`
+  SwiftUI button only hit-tests where its label actually draws, so the
+  toggle's real target was the ~11pt bird glyph rather than the pill it
+  looks like — the header now fills the notch's measured height and
+  stamps a `contentShape` over it.
+
+### Changed (fixed before merging #49)
+
+- `TokenUsageService`'s scan is now cached per file, keyed by
+  path+mtime+size — the original re-read and re-parsed every `.jsonl`
+  under `~/.claude/projects` from scratch on every 30-second tick, cost
+  growing unboundedly with total lifetime history. Closed files (mtime
+  unchanged) are never re-read; only files that actually changed since
+  the last scan are.
+- `TokenUsageStore.refresh()` now guards against overlapping scans — a
+  scan slower than the 30s timer interval could previously let a second,
+  concurrent scan start, and whichever finished last (not necessarily the
+  newest) won the write to `snapshot`.
+- The dedup key now falls back to a (timestamp, model, token counts)
+  composite when `message.id`/`requestId` are missing, instead of
+  silently skipping dedup entirely for that line.
+- `TokenUsageStore` now takes injectable `projectsRoot`/`defaults`/
+  `refreshInterval` parameters, matching the testability seam
+  `SessionStore` established (`docs/PATTERNS.md` #14) — the original had
+  no way to point it at a throwaway root/defaults in a test.
+- `Preferences`' two budget accessors and `PreferencesView`'s two slider
+  rows were near-identical copies of each other; factored into one
+  generic clamped-int accessor and one reusable slider row view.
+- `expandedContentHeight()` now accounts for the header divider and the
+  two bracketing the usage row (a `NotchLayout.dividerHeight` constant),
+  closing a small panel-height gap flagged both by code review and by
+  @luanhssa directly on the PR.
+- The panel no longer animates a resize every ~30s for no visual
+  change — `tokenUsageStore.$snapshot` republishes on every scan
+  regardless of whether the numbers actually changed, and the computed
+  frame doesn't depend on its value at all; `observeStore()` now applies
+  `.removeDuplicates()` before combining it in.
+- All 17 of #49's original tests pass unchanged; 8 new ones cover the
+  cache (a real content change is picked up; an unchanged file serves
+  the cached result even if its content is rewritten out from under it),
+  the dedup fallback, and `TokenUsageStore`'s injected-seam/lifecycle
+  behavior. 144 tests pass in total.
+
 ## [0.17.0] - 2026-08-18
 
 ### Added

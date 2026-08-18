@@ -29,9 +29,20 @@ as urgent, an optional system notification for when a session needs
 attention while the notch itself isn't a reliable signal (locked screen,
 no notch display), which display the panel is pinned to on a multi-monitor
 setup, an opt-in (off by default) mode that shows the real last message
-instead of just a tool name, and the "open at login" toggle. The moon button next
-to it snoozes every session's urgent highlight for 30 minutes of focus
-time; each session also has its own snooze button, in its expanded row.
+instead of just a tool name, the token budgets for the usage bars (below),
+and the "open at login" toggle. The moon button next to it snoozes every
+session's urgent highlight for 30 minutes of focus time; each session also
+has its own snooze button, in its expanded row.
+
+The expanded panel also carries usage bars laid out like Claude Code's own
+`/usage` panel — one row per limit, with its name, when it resets and the
+percentage consumed. Owl shows two: the current 5-hour window and the
+calendar week. The numbers come from the transcripts under
+`~/.claude/projects`; Claude Code doesn't publish your plan's allowances,
+so the ceilings the bars fill against are ones you set in Preferences.
+
+The About panel also has the app's only quit button — Owl has no Dock icon
+or menu bar item, so ⌘Q has nothing to hang off.
 
 ## How it works
 

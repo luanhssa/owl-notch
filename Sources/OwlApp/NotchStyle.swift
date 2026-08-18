@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 
 /// Styling constants for the notch's SwiftUI content — mirrors
 /// `NotchLayout`'s existing centralization of AppKit/SwiftUI-shared
@@ -19,6 +20,7 @@ enum NotchStyle {
     static let bodyFontSize: CGFloat = 10
     static let captionFontSize: CGFloat = 9
     static let tagFontSize: CGFloat = 8
+    static let tokenUsageFontSize: CGFloat = 9
 
     // MARK: - Opacity
 
@@ -33,6 +35,18 @@ enum NotchStyle {
     static let actionButtonBackgroundOpacity: Double = 0.9
     static let pulsingDotDimOpacity: Double = 0.3
     static let pulsingDotBrightOpacity: Double = 1
+    static let tokenUsageLabelOpacity: Double = 0.5
+    static let tokenUsageValueOpacity: Double = 0.85
+    static let tokenUsageBarTrackOpacity: Double = 0.15
+
+    // MARK: - Colors
+
+    /// The usage bars' fill, matching the blue Claude Code's own `/usage`
+    /// panel uses for the same limits. A flat color rather than one that
+    /// escalates with the percentage, for the same reason: the number next
+    /// to the bar already says how close to the ceiling you are, and a bar
+    /// that changes color trains you to only read it when it's loud.
+    static let tokenUsageBarTint = Color(red: 0.29, green: 0.50, blue: 0.95)
 
     // MARK: - Corner radii
 
@@ -72,6 +86,12 @@ enum NotchStyle {
     static let actionButtonVerticalPadding: CGFloat = 4
     static let pulsingDotTopPadding: CGFloat = 3
     static let emptyStateVerticalPadding: CGFloat = 14
+    static let tokenUsageRowHorizontalPadding: CGFloat = 10
+    static let tokenUsageItemSpacing: CGFloat = 3
+    static let tokenUsageRowSpacing: CGFloat = 6
+    static let tokenUsageBarHeight: CGFloat = 4
+    /// Gap between the 5-hour row and the weekly one.
+    static let tokenUsageSectionSpacing: CGFloat = 8
 
     // MARK: - Animation
 
