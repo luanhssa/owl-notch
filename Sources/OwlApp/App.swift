@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupPanel()
         observeStore()
+        observeDisplayChanges()
         registerLoginItemIfNeeded()
 
         ipcServer = IPCServer(store: sessionStore)
@@ -80,8 +81,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LoginItemService.setEnabled(true)
     }
 
+    /// The display to attach the panel to — `NSScreen.main` unless a
+    /// fixed display is set in Preferences (GH issue #36).
+    private var targetScreen: NSScreen? {
+        PanelDisplay.resolve(preferredDisplayID: Preferences.preferredDisplayID(), screens: NSScreen.screens, fallback: NSScreen.main)
+    }
+
+    /// Repositions the panel when a display is connected/disconnected or
+    /// rearranged, and when the user changes the preferred-display choice
+    /// in Preferences (GH issue #36) — neither is itself a `sessionStore`
+    /// change, so `observeStore()`'s triggers alone wouldn't catch them.
+    private func observeDisplayChanges() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.resizePanel() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: Preferences.preferredDisplayDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.resizePanel() }
+        }
+    }
+
     private func setupPanel() {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
         let frame = frameForPanel(on: screen)
 
         panel = NSPanel(
@@ -201,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func resizePanel() {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
         let newFrame = frameForPanel(on: screen)
         panel.setFrame(newFrame, display: true, animate: true)
         panel.contentView?.frame = NSRect(origin: .zero, size: newFrame.size)

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Owl's user-configurable settings (GH issue #34) — backed by
@@ -10,6 +11,13 @@ enum Preferences {
     private static let staleSessionCutoffHoursKey = "owl.staleSessionCutoffHours"
     private static let notifyOnSessionDoneKey = "owl.notifyOnSessionDone"
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
+    private static let preferredDisplayIDKey = "owl.preferredDisplayID"
+
+    /// Posted whenever `setPreferredDisplayID` changes the stored value —
+    /// nothing else would otherwise tell `AppDelegate` to reposition the
+    /// panel, since changing a preference isn't itself a screen-parameter
+    /// change (GH issue #36).
+    static let preferredDisplayDidChangeNotification = Notification.Name("owl.preferredDisplayDidChange")
 
     static let defaultStaleSessionCutoffHours: Double = 12
     static let staleSessionCutoffHoursRange: ClosedRange<Double> = 1...48
@@ -45,5 +53,23 @@ enum Preferences {
 
     static func setSystemNotificationsEnabled(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: systemNotificationsEnabledKey)
+    }
+
+    /// `nil` means no preference — the panel follows `NSScreen.main` as
+    /// before (GH issue #36). Set means "always this display, when it's
+    /// connected" — see `PanelDisplay.resolve` for the fallback when it
+    /// isn't.
+    static func preferredDisplayID(defaults: UserDefaults = .standard) -> CGDirectDisplayID? {
+        guard let stored = defaults.object(forKey: preferredDisplayIDKey) as? Int else { return nil }
+        return CGDirectDisplayID(stored)
+    }
+
+    static func setPreferredDisplayID(_ displayID: CGDirectDisplayID?, defaults: UserDefaults = .standard) {
+        if let displayID {
+            defaults.set(Int(displayID), forKey: preferredDisplayIDKey)
+        } else {
+            defaults.removeObject(forKey: preferredDisplayIDKey)
+        }
+        NotificationCenter.default.post(name: preferredDisplayDidChangeNotification, object: nil)
     }
 }

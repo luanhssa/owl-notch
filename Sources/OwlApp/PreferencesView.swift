@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Preferences window (GH issue #34) — Owl's third and last UI surface
@@ -8,12 +9,14 @@ struct PreferencesView: View {
     @State private var notifyOnSessionDone: Bool
     @State private var systemNotificationsEnabled: Bool
     @State private var loginItemEnabled: Bool
+    @State private var preferredDisplayID: CGDirectDisplayID?
 
     init() {
         _staleSessionCutoffHours = State(initialValue: Preferences.staleSessionCutoffHours())
         _notifyOnSessionDone = State(initialValue: Preferences.notifyOnSessionDone())
         _systemNotificationsEnabled = State(initialValue: Preferences.systemNotificationsEnabled())
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
+        _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
     }
 
     var body: some View {
@@ -72,6 +75,26 @@ struct PreferencesView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Tela")
+                    .font(.headline)
+
+                Picker("Mostrar o Owl em", selection: $preferredDisplayID) {
+                    Text("Automático (tela principal)").tag(CGDirectDisplayID?.none)
+                    ForEach(NSScreen.screens, id: \.self) { screen in
+                        Text(screen.localizedName).tag(PanelDisplay.displayID(for: screen))
+                    }
+                }
+                .onChange(of: preferredDisplayID) { newValue in
+                    Preferences.setPreferredDisplayID(newValue)
+                }
+                Text("Só importa com mais de uma tela conectada — o Owl não segue automaticamente a janela do terminal entre telas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Divider()

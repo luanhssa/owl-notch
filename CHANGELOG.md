@@ -10,6 +10,25 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-18
+
+### Added
+
+- Multi-display support ([#36](https://github.com/luanhssa/owl-notch/issues/36)):
+  a "Tela" section in Preferences lets you pin the notch panel to a fixed
+  display instead of always `NSScreen.main`. New `PanelDisplay.resolve`
+  falls back to the main screen when no preference is set, or when the
+  chosen display isn't currently connected. The panel repositions on
+  `NSApplication.didChangeScreenParametersNotification` (monitor
+  connected/disconnected/rearranged) and on the preference changing,
+  neither of which is a `SessionStore` change `observeStore()`'s existing
+  triggers would have caught.
+  - Deliberately doesn't try to track "the display the relevant terminal
+    window is currently on" dynamically — real per-window tracking
+    machinery for a multi-monitor-only need the issue itself says a fixed
+    preference already covers.
+  - 7 new tests; all 95 pass.
+
 ## [0.14.0] - 2026-08-18
 
 ### Added

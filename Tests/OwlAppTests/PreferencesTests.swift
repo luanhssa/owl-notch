@@ -45,4 +45,19 @@ final class PreferencesTests: XCTestCase {
         Preferences.setNotifyOnSessionDone(false, defaults: defaults)
         XCTAssertFalse(Preferences.notifyOnSessionDone(defaults: defaults))
     }
+
+    func testPreferredDisplayIDDefaultsToNilWhenUnset() {
+        XCTAssertNil(Preferences.preferredDisplayID(defaults: defaults))
+    }
+
+    func testPreferredDisplayIDRoundTrips() {
+        Preferences.setPreferredDisplayID(42, defaults: defaults)
+        XCTAssertEqual(Preferences.preferredDisplayID(defaults: defaults), 42)
+    }
+
+    func testPreferredDisplayIDCanBeClearedBackToNil() {
+        Preferences.setPreferredDisplayID(42, defaults: defaults)
+        Preferences.setPreferredDisplayID(nil, defaults: defaults)
+        XCTAssertNil(Preferences.preferredDisplayID(defaults: defaults))
+    }
 }
