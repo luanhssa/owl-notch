@@ -78,11 +78,26 @@ struct SessionInfo: Identifiable, Codable {
     /// #33). `nil` means not snoozed; a past value is simply inert, not
     /// actively cleared once it elapses.
     var snoozedUntil: Date?
+    /// The actual last message/tool-result text from the transcript, opt-in
+    /// via Preferences and off by default (GH issue #45) — richer than
+    /// `lastToolSummary`'s terse one-line label, but a different privacy
+    /// posture: real conversation content instead of just a tool name.
+    /// Deliberately excluded from `CodingKeys` below so it's never written
+    /// to `sessions.json` — this is the one field here that can carry
+    /// genuinely sensitive content, so it shouldn't linger on disk between
+    /// relaunches the way the rest of a session's metadata does.
+    var lastMessageContent: String?
 
     var id: String { sessionID }
 
     var displayTitle: String {
         title ?? projectName
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID, title, projectName, cwd, gitBranch, environment, state
+        case stateEnteredAt, lastEventAt, lastToolName, lastToolSummary
+        case terminalApp, terminalTTY, tmuxPane, acknowledged, snoozedUntil
     }
 }
 
@@ -497,6 +512,14 @@ final class SessionStore: ObservableObject {
         if info.gitBranch == nil {
             kickOffGitBranchLookupIfNeeded(sessionID: sessionID, cwd: cwd)
         }
+        if Preferences.showLastMessageContent(defaults: defaults) {
+            kickOffLastMessageLookupIfNeeded(sessionID: sessionID, transcriptPath: input.transcriptPath)
+        } else if info.lastMessageContent != nil {
+            // Honor the opt-out immediately rather than just stopping new
+            // fetches — already-fetched content shouldn't linger once the
+            // user turns this off (GH issue #45).
+            info.lastMessageContent = nil
+        }
 
         sessions[sessionID] = info
         enforceSessionCap()
@@ -510,6 +533,7 @@ final class SessionStore: ObservableObject {
     /// before the first one resolves (GH issue #24).
     private var pendingTitleLookups: Set<String> = []
     private var pendingGitBranchLookups: Set<String> = []
+    private var pendingLastMessageLookups: Set<String> = []
 
     /// Moves `SessionTitleService`'s transcript read off the main actor
     /// (GH issue #24, phase 3) — `SidebarTitleService`'s own tree scan was
@@ -548,6 +572,31 @@ final class SessionStore: ObservableObject {
                 pendingGitBranchLookups.remove(sessionID)
                 guard let branch, var info = sessions[sessionID], info.gitBranch == nil else { return }
                 info.gitBranch = branch
+                sessions[sessionID] = info
+                schedulePersist()
+            }
+        }
+    }
+
+    /// Same background-Task-then-hop-to-MainActor shape as
+    /// `kickOffTitleLookupIfNeeded`/`kickOffGitBranchLookupIfNeeded`, for
+    /// `LastMessageService`'s transcript read (GH issue #45) — but
+    /// deliberately without an "only if nil" gate, since (unlike a
+    /// session's title or git branch, each fixed once found) the last
+    /// message changes on every turn and needs to keep refreshing. Rechecks
+    /// the preference after the hop, not just before starting, so a lookup
+    /// already in flight when the user disables the toggle can't resurrect
+    /// content right after `handle(envelope:)` just cleared it.
+    private func kickOffLastMessageLookupIfNeeded(sessionID: String, transcriptPath: String?) {
+        guard !pendingLastMessageLookups.contains(sessionID) else { return }
+        pendingLastMessageLookups.insert(sessionID)
+        Task.detached { [weak self] in
+            let content = LastMessageService.lastMessageText(transcriptPath: transcriptPath)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                pendingLastMessageLookups.remove(sessionID)
+                guard Preferences.showLastMessageContent(defaults: defaults), var info = sessions[sessionID] else { return }
+                info.lastMessageContent = content
                 sessions[sessionID] = info
                 schedulePersist()
             }

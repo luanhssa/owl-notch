@@ -12,6 +12,7 @@ enum Preferences {
     private static let notifyOnSessionDoneKey = "owl.notifyOnSessionDone"
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
+    private static let showLastMessageContentKey = "owl.showLastMessageContent"
 
     /// Posted whenever `setPreferredDisplayID` changes the stored value —
     /// nothing else would otherwise tell `AppDelegate` to reposition the
@@ -71,5 +72,18 @@ enum Preferences {
             defaults.removeObject(forKey: preferredDisplayIDKey)
         }
         NotificationCenter.default.post(name: preferredDisplayDidChangeNotification, object: nil)
+    }
+
+    /// Off by default (GH issue #45) — a different privacy posture than
+    /// `lastToolSummary`'s terse label, since this surfaces real
+    /// conversation content in Owl's always-visible notch panel. Turning
+    /// it off also clears any already-fetched content rather than just
+    /// stopping new fetches — see `SessionStore.handle(envelope:)`.
+    static func showLastMessageContent(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showLastMessageContentKey) as? Bool ?? false
+    }
+
+    static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showLastMessageContentKey)
     }
 }

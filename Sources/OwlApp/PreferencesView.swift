@@ -10,6 +10,7 @@ struct PreferencesView: View {
     @State private var systemNotificationsEnabled: Bool
     @State private var loginItemEnabled: Bool
     @State private var preferredDisplayID: CGDirectDisplayID?
+    @State private var showLastMessageContent: Bool
 
     init() {
         _staleSessionCutoffHours = State(initialValue: Preferences.staleSessionCutoffHours())
@@ -17,6 +18,7 @@ struct PreferencesView: View {
         _systemNotificationsEnabled = State(initialValue: Preferences.systemNotificationsEnabled())
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
+        _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
     }
 
     var body: some View {
@@ -93,6 +95,21 @@ struct PreferencesView: View {
                     Preferences.setPreferredDisplayID(newValue)
                 }
                 Text("Só importa com mais de uma tela conectada — o Owl não segue automaticamente a janela do terminal entre telas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Conteúdo")
+                    .font(.headline)
+
+                Toggle("Mostrar o conteúdo da última mensagem", isOn: $showLastMessageContent)
+                    .onChange(of: showLastMessageContent) { newValue in
+                        Preferences.setShowLastMessageContent(newValue)
+                    }
+                Text("Desligado por padrão: mostra o texto real da última mensagem/resultado em vez de só o nome da ferramenta — conteúdo da conversa, possivelmente sensível, numa tela sempre visível.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

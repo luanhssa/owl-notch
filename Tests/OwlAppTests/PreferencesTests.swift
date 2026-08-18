@@ -60,4 +60,13 @@ final class PreferencesTests: XCTestCase {
         Preferences.setPreferredDisplayID(nil, defaults: defaults)
         XCTAssertNil(Preferences.preferredDisplayID(defaults: defaults))
     }
+
+    func testShowLastMessageContentDefaultsToFalseWhenUnset() {
+        XCTAssertFalse(Preferences.showLastMessageContent(defaults: defaults))
+    }
+
+    func testShowLastMessageContentRoundTrips() {
+        Preferences.setShowLastMessageContent(true, defaults: defaults)
+        XCTAssertTrue(Preferences.showLastMessageContent(defaults: defaults))
+    }
 }

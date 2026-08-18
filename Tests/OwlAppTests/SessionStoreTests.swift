@@ -352,6 +352,76 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions["s1"]?.title, "Fix the async lookup")
     }
 
+    // MARK: - Opt-in last-message content (GH issue #45)
+
+    private func writeTranscriptWithLastMessage(_ text: String) throws -> String {
+        let transcriptPath = FileManager.default.temporaryDirectory.appendingPathComponent("owl-lastmessage-test-\(UUID().uuidString).jsonl").path
+        let line = "{\"type\":\"assistant\",\"message\":{\"content\":\"\(text)\"}}\n"
+        try line.write(toFile: transcriptPath, atomically: true, encoding: .utf8)
+        return transcriptPath
+    }
+
+    func testLastMessageContentIsNotFetchedWhileToggleIsOff() async throws {
+        let transcriptPath = try writeTranscriptWithLastMessage("Should not appear")
+        defer { try? FileManager.default.removeItem(atPath: transcriptPath) }
+
+        let hookInput: [String: Any] = ["session_id": "s1", "cwd": "/tmp", "transcript_path": transcriptPath]
+        let json: [String: Any] = ["event_type": "notification", "hook_input": hookInput, "environment": "cli"]
+        let data = try JSONSerialization.data(withJSONObject: json)
+        store.handle(envelope: HookEnvelope(data: data)!)
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertNil(store.sessions["s1"]?.lastMessageContent)
+    }
+
+    func testLastMessageContentResolvesAsynchronouslyWhenToggleIsOn() async throws {
+        Preferences.setShowLastMessageContent(true, defaults: defaults)
+        let transcriptPath = try writeTranscriptWithLastMessage("Fix the async lookup")
+        defer { try? FileManager.default.removeItem(atPath: transcriptPath) }
+
+        let hookInput: [String: Any] = ["session_id": "s1", "cwd": "/tmp", "transcript_path": transcriptPath]
+        let json: [String: Any] = ["event_type": "notification", "hook_input": hookInput, "environment": "cli"]
+        let data = try JSONSerialization.data(withJSONObject: json)
+        store.handle(envelope: HookEnvelope(data: data)!)
+        XCTAssertNil(store.sessions["s1"]?.lastMessageContent, "the lookup runs on a background Task, not inline")
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.sessions["s1"]?.lastMessageContent == nil, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(store.sessions["s1"]?.lastMessageContent, "Fix the async lookup")
+    }
+
+    func testLastMessageContentIsClearedAssoonAsToggleIsTurnedOff() async throws {
+        Preferences.setShowLastMessageContent(true, defaults: defaults)
+        let transcriptPath = try writeTranscriptWithLastMessage("Visible while on")
+        defer { try? FileManager.default.removeItem(atPath: transcriptPath) }
+
+        let hookInput: [String: Any] = ["session_id": "s1", "cwd": "/tmp", "transcript_path": transcriptPath]
+        let json: [String: Any] = ["event_type": "notification", "hook_input": hookInput, "environment": "cli"]
+        let data = try JSONSerialization.data(withJSONObject: json)
+        store.handle(envelope: HookEnvelope(data: data)!)
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.sessions["s1"]?.lastMessageContent == nil, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertNotNil(store.sessions["s1"]?.lastMessageContent, "precondition: content should have resolved while the toggle was on")
+
+        Preferences.setShowLastMessageContent(false, defaults: defaults)
+        store.handle(envelope: HookEnvelope(data: data)!)
+        XCTAssertNil(store.sessions["s1"]?.lastMessageContent, "turning the toggle off should clear already-fetched content immediately")
+    }
+
+    func testLastMessageContentIsNeverPersistedToDisk() throws {
+        var info = makeSessionInfo(environment: .cli)
+        info.lastMessageContent = "sensitive conversation content"
+
+        let data = try JSONEncoder().encode(info)
+        let decoded = try JSONDecoder().decode(SessionInfo.self, from: data)
+        XCTAssertNil(decoded.lastMessageContent, "lastMessageContent must be excluded from Codable so it never reaches sessions.json")
+    }
+
     func testPersistedSessionRespectsConfiguredStaleCutoff() throws {
         Preferences.setStaleSessionCutoffHours(1, defaults: defaults)
 

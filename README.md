@@ -28,7 +28,8 @@ Preferences — the stale-session cutoff, whether a finished session counts
 as urgent, an optional system notification for when a session needs
 attention while the notch itself isn't a reliable signal (locked screen,
 no notch display), which display the panel is pinned to on a multi-monitor
-setup, and the "open at login" toggle. The moon button next
+setup, an opt-in (off by default) mode that shows the real last message
+instead of just a tool name, and the "open at login" toggle. The moon button next
 to it snoozes every session's urgent highlight for 30 minutes of focus
 time; each session also has its own snooze button, in its expanded row.
 

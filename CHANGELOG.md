@@ -10,6 +10,33 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-18
+
+### Added
+
+- An opt-in "show the real last message" mode
+  ([#45](https://github.com/luanhssa/owl-notch/issues/45)), off by
+  default — the issue itself flagged this as a different privacy
+  posture than `lastToolSummary`'s terse label (real conversation
+  content, potentially sensitive, in an always-visible panel) and asked
+  for an explicit decision before implementing; decided to ship it
+  behind a Preferences toggle rather than as the default or not at all.
+  - New `LastMessageService` reads the *last* qualifying line from a
+    session's transcript (the "last message" counterpart to
+    `SessionTitleService`'s "first message"), rendered with basic
+    inline markdown (bold/italic/code/links).
+  - Refreshed on every relevant hook event while the toggle is on — not
+    cached once-and-done like a session's title/branch, since the
+    answer changes on every turn — via the same background-`Task`-then-
+    hop-to-`@MainActor` shape `SessionStore` already uses (#24).
+  - `SessionInfo.lastMessageContent` is deliberately excluded from
+    `Codable`, so it's never written to `sessions.json` — the one field
+    on a session that can carry real conversation content shouldn't
+    linger on disk between relaunches the way the rest of a session's
+    metadata does. Turning the toggle off also clears any
+    already-fetched content immediately, not just new fetches.
+  - 14 new tests; all 109 pass.
+
 ## [0.15.0] - 2026-08-18
 
 ### Added

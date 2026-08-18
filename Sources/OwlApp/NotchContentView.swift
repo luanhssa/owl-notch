@@ -23,6 +23,19 @@ private func remainingSnoozeMinutes(until: Date) -> Int {
     max(0, Int(ceil(until.timeIntervalSinceNow / 60)))
 }
 
+/// Renders basic inline markdown (bold/italic/code/links) for the opt-in
+/// last-message content (GH issue #45) — `.inlineOnlyPreservingWhitespace`
+/// rather than full block parsing, since headers/lists/code blocks don't
+/// fit meaningfully in the notch's few lines of space anyway. Falls back
+/// to plain text if the string doesn't parse as markdown for some reason.
+private func markdownText(_ raw: String) -> Text {
+    let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    guard let attributed = try? AttributedString(markdown: raw, options: options) else {
+        return Text(raw)
+    }
+    return Text(attributed)
+}
+
 struct NotchPillView: View {
     @ObservedObject var store: SessionStore
 
@@ -149,7 +162,21 @@ struct SessionRowView: View {
                             .font(.system(size: NotchStyle.captionFontSize))
                             .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                     }
-                    if let summary = session.lastToolSummary {
+                    // Opt-in richer content (GH issue #45) takes priority
+                    // over the terse tool-name summary when present — see
+                    // Preferences' "Mostrar o conteúdo da última mensagem".
+                    if let content = session.lastMessageContent {
+                        HStack(alignment: .top, spacing: NotchStyle.toolSummarySpacing) {
+                            if session.state == .running {
+                                PulsingDot(color: color(for: session.state))
+                                    .padding(.top, NotchStyle.pulsingDotTopPadding)
+                            }
+                            markdownText(content)
+                                .font(.system(size: NotchStyle.captionFontSize))
+                                .foregroundStyle(.white.opacity(NotchStyle.secondaryTextOpacity))
+                                .lineLimit(5)
+                        }
+                    } else if let summary = session.lastToolSummary {
                         HStack(alignment: .top, spacing: NotchStyle.toolSummarySpacing) {
                             if session.state == .running {
                                 PulsingDot(color: color(for: session.state))

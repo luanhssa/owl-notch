@@ -196,3 +196,23 @@ happens to inherit. If a future subprocess integration skips this, it's
 worth a live test against the real binary before shipping — a fixture-only
 test can't catch a bug that only exists in how the *real* tool behaves
 under the *real* environment Owl actually runs with.
+
+## 18. A field carrying real conversation content needs its own privacy decision, and its own `CodingKeys` exclusion
+
+`SessionInfo.lastMessageContent` (GH issue #45) is the one field on a
+session that can hold genuinely sensitive content — the actual text of a
+message, not just a tool name or file path. Two things follow from that,
+both worth repeating for any future field in the same category:
+
+1. Whether to surface it at all needs an explicit, separate decision from
+   "should we implement this issue" — see the issue's own note asking for
+   one, and #48's decision on in-panel approve/deny as the precedent for
+   treating "does this change what Owl exposes" as its own question.
+2. It's excluded from `SessionInfo`'s `CodingKeys` on purpose, so it's
+   simply never written to `sessions.json` — every other field syncs to
+   disk for the next relaunch; this one is refetched live instead,
+   specifically so it doesn't sit in plaintext on disk between sessions.
+   A field excluded like this needs a *default value* (nil, for an
+   Optional) so `Decodable` synthesis still works — same rule that lets
+   `terminalTTY`/`tmuxPane`/`snoozedUntil` be omitted from older
+   persisted JSON without a migration.
