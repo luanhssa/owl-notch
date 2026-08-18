@@ -10,6 +10,33 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-18
+
+### Added
+
+- Phase 2 of tmux-aware session targeting
+  ([#41](https://github.com/luanhssa/owl-notch/issues/41)): "Abrir sessão"
+  on a tmux-hosted session now resolves and switches to the *exact* pane,
+  not just the terminal application. New `TmuxTargetResolver` shells out
+  to the real `tmux` binary — a pane's own pty (captured as `tmuxPane` by
+  phase 1) is a different device from the tty of the Terminal.app/iTerm2
+  tab actually showing it, so this resolves the attached client's tty via
+  `tmux list-panes`/`list-clients`, switches that client onto the target
+  pane (`tmux switch-client -t <paneID>`), and hands the resolved tty to
+  `SessionFocusService`'s existing tab-targeting (#31).
+  - Verified against a real tmux 3.7c session on this machine (installed
+    specifically to verify this, rather than shipping it unconfirmed the
+    way phase 1 was deferred). That live verification caught a real bug
+    before shipping: tmux silently substitutes `_` for non-printable
+    bytes — including the literal tab used as `-F` output's field
+    separator — when it can't confirm a UTF-8 locale, which is exactly
+    the bare environment a login-item-launched `.app` gets from
+    `launchd` (no `LANG`/`LC_ALL`). `TmuxTargetResolver` now forces
+    `LC_ALL`/`LANG` explicitly rather than depending on whatever locale
+    Owl happens to inherit.
+  - 9 new tests for the pure pane/client parsing logic, with fixtures
+    captured from real `tmux` output; all 88 pass.
+
 ## [0.13.1] - 2026-08-17
 
 ### Changed

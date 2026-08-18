@@ -177,3 +177,22 @@ several `PreToolUse` calls in a row) each kicking off a redundant lookup
 before the first resolves. Follow this shape for any future lookup that
 needs to move off the main actor: never `await` inside a method that also
 mutates shared actor state before and after the suspension point.
+
+## 17. Subprocesses that emit structured output need an explicit UTF-8 locale — don't trust the inherited one
+
+`TmuxTargetResolver` shells out to `tmux` and parses tab-delimited `-F`
+output. Verified live (GH issue #41, phase 2): without a UTF-8 locale in
+its environment, `tmux` silently substitutes `_` for non-printable bytes
+in that output — including the literal tab used as the field separator —
+corrupting every parse with no error, no crash, just wrong data. A
+login-item-launched `.app` gets exactly this bare environment from
+`launchd` (no `LANG`/`LC_ALL` set), unlike a shell-launched process, which
+is why this wasn't caught by the pure-parsing unit tests (they never touch
+a real subprocess) and would only have shown up as a silent, hard-to-
+diagnose failure in production. The fix: explicitly set `LC_ALL`/`LANG` on
+`Process.environment` before invoking any subprocess whose output gets
+parsed by field/delimiter, rather than depending on whatever locale Owl
+happens to inherit. If a future subprocess integration skips this, it's
+worth a live test against the real binary before shipping — a fixture-only
+test can't catch a bug that only exists in how the *real* tool behaves
+under the *real* environment Owl actually runs with.

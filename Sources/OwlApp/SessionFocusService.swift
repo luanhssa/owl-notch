@@ -19,11 +19,13 @@ import OwlShared
 /// this CLI session at all yet (no on-disk record found), there's nothing to
 /// collide with, so we fall back to the plain CLI session id — that always
 /// goes through the normal import path.
-/// `.cli`/`.unknown` first try precise tab targeting (below) when the
-/// terminal app and pty are both known and supported; otherwise, and always
-/// for `.cowork`, this just brings the app to the front. Cowork targeting
-/// stays a stretch goal (GH issue #31 covers terminal tab/window targeting
-/// specifically, not Cowork).
+/// `.cli`/`.unknown` first try, in order: tmux-aware pane targeting (when
+/// `tmuxPane` is set — GH issue #41, phase 2, via `TmuxTargetResolver`),
+/// then plain precise tab targeting by the session's own controlling tty
+/// (GH issue #31), then just bringing the app to the front. Always the
+/// app-level fallback for `.cowork`. Cowork targeting stays a stretch goal
+/// (GH issue #31 covers terminal tab/window targeting specifically, not
+/// Cowork).
 enum SessionFocusService {
     static let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
 
@@ -49,6 +51,14 @@ enum SessionFocusService {
             activate(bundleIdentifier: claudeDesktopBundleID, fallbackAppName: "Claude")
         case .cli, .unknown:
             let appName = session.terminalApp ?? "Terminal"
+            if
+                let tmuxPane = session.tmuxPane,
+                supportsPreciseTargeting(terminalAppName: appName),
+                let clientTTY = TmuxTargetResolver.activatePane(tmuxPane),
+                selectTab(withTTY: clientTTY, inTerminalApp: appName)
+            {
+                return
+            }
             if
                 let tty = session.terminalTTY,
                 supportsPreciseTargeting(terminalAppName: appName),
