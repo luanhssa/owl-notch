@@ -83,6 +83,10 @@ Launch it once with:
 open /Applications/Owl.app
 ```
 
+Already in a Claude Code session at this repo instead of a plain terminal?
+Run `/owl-setup` — it does the same install, without leaving the session
+(GH issue #47).
+
 ### Wiring up the hooks
 
 `install.sh` does **not** touch `~/.claude/settings.json` on its own — the

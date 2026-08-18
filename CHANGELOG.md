@@ -10,6 +10,18 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-18
+
+### Added
+
+- A `/owl-setup` slash command ([#47](https://github.com/luanhssa/owl-notch/issues/47)):
+  new `.claude/skills/owl-setup/SKILL.md`, a lightweight parallel install
+  path for anyone already in a Claude Code session at this repo, running
+  the same `Scripts/install.sh` the terminal-based install always has,
+  without leaving the session. `disable-model-invocation: true` so this
+  only ever runs when explicitly invoked, never something the agent
+  decides to run on its own.
+
 ## [0.16.0] - 2026-08-18
 
 ### Added
