@@ -15,6 +15,8 @@ enum Preferences {
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
     private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
     private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
+    private static let weeklyResetWeekdayKey = "owl.weeklyResetWeekday"
+    private static let weeklyResetHourKey = "owl.weeklyResetHour"
 
     /// Posted whenever `setPreferredDisplayID` changes the stored value —
     /// nothing else would otherwise tell `AppDelegate` to reposition the
@@ -120,6 +122,47 @@ enum Preferences {
 
     static func setWeeklyTokenBudget(_ tokens: Int, defaults: UserDefaults = .standard) {
         setClampedInt(tokens, key: weeklyTokenBudgetKey, range: weeklyTokenBudgetRange, defaults: defaults)
+    }
+
+    /// When the weekly usage bar rolls over, in the user's own local time.
+    /// Claude Code doesn't expose your account's actual weekly-limit reset
+    /// schedule anywhere Owl can read it, so this defaults to `nil` —
+    /// "not set", meaning `TokenUsageService` falls back to the plain
+    /// calendar week (whatever the system Region considers day one), the
+    /// same approximation Owl always used. Set it to whatever day
+    /// Claude Code's own `/usage` panel shows as your reset day and the
+    /// weekly bar rolls over in sync with it instead. `1...7` is
+    /// `Calendar`'s own weekday numbering (1 = Sunday … 7 = Saturday).
+    static func weeklyResetWeekday(defaults: UserDefaults = .standard) -> Int? {
+        guard
+            let stored = defaults.object(forKey: weeklyResetWeekdayKey) as? Int,
+            (1...7).contains(stored)
+        else { return nil }
+        return stored
+    }
+
+    static func setWeeklyResetWeekday(_ weekday: Int?, defaults: UserDefaults = .standard) {
+        if let weekday, (1...7).contains(weekday) {
+            defaults.set(weekday, forKey: weeklyResetWeekdayKey)
+        } else {
+            defaults.removeObject(forKey: weeklyResetWeekdayKey)
+        }
+    }
+
+    /// The hour (0–23, local time) paired with `weeklyResetWeekday`. Only
+    /// meaningful once a reset weekday is actually set; ignored otherwise.
+    static let defaultWeeklyResetHour = 0
+
+    static func weeklyResetHour(defaults: UserDefaults = .standard) -> Int {
+        guard
+            let stored = defaults.object(forKey: weeklyResetHourKey) as? Int,
+            (0...23).contains(stored)
+        else { return defaultWeeklyResetHour }
+        return stored
+    }
+
+    static func setWeeklyResetHour(_ hour: Int, defaults: UserDefaults = .standard) {
+        defaults.set(min(max(hour, 0), 23), forKey: weeklyResetHourKey)
     }
 
     /// Shared by `tokenWindowBudget`/`weeklyTokenBudget` — they were

@@ -122,4 +122,47 @@ final class PreferencesTests: XCTestCase {
         defaults.set(0, forKey: "owl.weeklyTokenBudget")
         XCTAssertEqual(Preferences.weeklyTokenBudget(defaults: defaults), Preferences.weeklyTokenBudgetRange.lowerBound)
     }
+
+    func testWeeklyResetWeekdayDefaultsToNilWhenUnset() {
+        XCTAssertNil(Preferences.weeklyResetWeekday(defaults: defaults))
+    }
+
+    func testWeeklyResetWeekdayRoundTrips() {
+        Preferences.setWeeklyResetWeekday(4, defaults: defaults)
+        XCTAssertEqual(Preferences.weeklyResetWeekday(defaults: defaults), 4)
+    }
+
+    func testWeeklyResetWeekdayCanBeClearedBackToNil() {
+        Preferences.setWeeklyResetWeekday(4, defaults: defaults)
+        Preferences.setWeeklyResetWeekday(nil, defaults: defaults)
+        XCTAssertNil(Preferences.weeklyResetWeekday(defaults: defaults))
+    }
+
+    /// An out-of-range value (1...7 is `Calendar`'s weekday numbering)
+    /// written directly, or passed to the setter, is treated as unset
+    /// rather than handed to `Calendar` where it would misbehave.
+    func testWeeklyResetWeekdayIgnoresOutOfRangeValue() {
+        defaults.set(8, forKey: "owl.weeklyResetWeekday")
+        XCTAssertNil(Preferences.weeklyResetWeekday(defaults: defaults))
+
+        Preferences.setWeeklyResetWeekday(0, defaults: defaults)
+        XCTAssertNil(Preferences.weeklyResetWeekday(defaults: defaults))
+    }
+
+    func testWeeklyResetHourDefaultsWhenUnset() {
+        XCTAssertEqual(Preferences.weeklyResetHour(defaults: defaults), Preferences.defaultWeeklyResetHour)
+    }
+
+    func testWeeklyResetHourRoundTrips() {
+        Preferences.setWeeklyResetHour(9, defaults: defaults)
+        XCTAssertEqual(Preferences.weeklyResetHour(defaults: defaults), 9)
+    }
+
+    func testWeeklyResetHourClampsToValidRange() {
+        Preferences.setWeeklyResetHour(-3, defaults: defaults)
+        XCTAssertEqual(Preferences.weeklyResetHour(defaults: defaults), 0)
+
+        Preferences.setWeeklyResetHour(99, defaults: defaults)
+        XCTAssertEqual(Preferences.weeklyResetHour(defaults: defaults), 23)
+    }
 }
