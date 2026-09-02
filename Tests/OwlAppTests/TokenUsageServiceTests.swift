@@ -252,6 +252,52 @@ final class TokenUsageServiceTests: XCTestCase {
         XCTAssertGreaterThan(weekEnd, referenceNow)
     }
 
+    /// A configured reset weekday/hour (Preferences, GH: weekly reset date
+    /// bug report) is honored instead of the plain calendar week — turns
+    /// are split relative to *that* instant, not the locale's week start.
+    func testConfiguredWeeklyResetAnchorsToGivenWeekdayAndHour() throws {
+        let calendar = Calendar.current
+        var components = DateComponents()
+        components.weekday = 4 // Wednesday
+        components.hour = 9
+        components.minute = 0
+        components.second = 0
+        let expectedStart = try XCTUnwrap(
+            calendar.nextDate(
+                after: referenceNow,
+                matching: components,
+                matchingPolicy: .nextTimePreservingSmallerComponents,
+                direction: .backward
+            )
+        )
+        let justBeforeReset = calendar.date(byAdding: .second, value: -1, to: expectedStart)!
+        let justAfterReset = calendar.date(byAdding: .second, value: 1, to: expectedStart)!
+
+        try writeTranscript(
+            [
+                assistantLine(timestamp: iso(justBeforeReset), inputTokens: 999, outputTokens: 0),
+                assistantLine(timestamp: iso(justAfterReset), inputTokens: 42, outputTokens: 0),
+            ],
+            to: "project/session.jsonl"
+        )
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, weekResetWeekday: 4, weekResetHour: 9, now: referenceNow)
+
+        XCTAssertEqual(snapshot.weekTokens, 42)
+        XCTAssertEqual(snapshot.weekEnd, calendar.date(byAdding: .day, value: 7, to: expectedStart))
+    }
+
+    /// Explicit `nil` (as well as omitting the parameter, covered by every
+    /// other test above) falls back to the plain calendar week — the same
+    /// default Owl always used before the reset day became configurable.
+    func testNilWeeklyResetWeekdayFallsBackToCalendarWeek() throws {
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project/session.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, weekResetWeekday: nil, now: referenceNow)
+
+        XCTAssertEqual(snapshot.weekEnd, Calendar.current.dateInterval(of: .weekOfYear, for: referenceNow)!.end)
+    }
+
     func testWindowEndIsFiveHoursAfterItsStart() throws {
         try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project-a/session-1.jsonl")
 

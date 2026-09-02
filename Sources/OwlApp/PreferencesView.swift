@@ -48,6 +48,8 @@ struct PreferencesView: View {
     /// ever reach the other end, and the label would be unreadable.
     @State private var tokenWindowBudgetMillions: Double
     @State private var weeklyTokenBudgetMillions: Double
+    @State private var weeklyResetWeekday: Int?
+    @State private var weeklyResetHour: Int
 
     private var budgetRangeInMillions: ClosedRange<Double> {
         Double(Preferences.tokenWindowBudgetRange.lowerBound) / 1_000_000
@@ -68,6 +70,16 @@ struct PreferencesView: View {
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
         _tokenWindowBudgetMillions = State(initialValue: Double(Preferences.tokenWindowBudget()) / 1_000_000)
         _weeklyTokenBudgetMillions = State(initialValue: Double(Preferences.weeklyTokenBudget()) / 1_000_000)
+        _weeklyResetWeekday = State(initialValue: Preferences.weeklyResetWeekday())
+        _weeklyResetHour = State(initialValue: Preferences.weeklyResetHour())
+    }
+
+    /// `Calendar`'s weekday numbering is 1-based starting at Sunday, and
+    /// `weekdaySymbols` is already localized/capitalized for the current
+    /// locale (unlike `standaloneWeekdaySymbols`, which some locales — incl.
+    /// pt-BR — render lowercase, as they would mid-sentence).
+    private func weekdayLabel(_ weekday: Int) -> String {
+        Calendar.current.weekdaySymbols[weekday - 1]
     }
 
     var body: some View {
@@ -179,6 +191,31 @@ struct PreferencesView: View {
                 )
 
                 Text("O Claude Code não expõe os limites do seu plano, então as barras no notch enchem em relação a estes valores.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("Reinício semanal", selection: $weeklyResetWeekday) {
+                    Text("Automático (semana do calendário)").tag(Int?.none)
+                    ForEach(1...7, id: \.self) { weekday in
+                        Text(weekdayLabel(weekday)).tag(Int?.some(weekday))
+                    }
+                }
+                .onChange(of: weeklyResetWeekday) { newValue in
+                    Preferences.setWeeklyResetWeekday(newValue)
+                }
+
+                if weeklyResetWeekday != nil {
+                    Picker("Horário", selection: $weeklyResetHour) {
+                        ForEach(0..<24, id: \.self) { hour in
+                            Text(String(format: "%02d:00", hour)).tag(hour)
+                        }
+                    }
+                    .onChange(of: weeklyResetHour) { newValue in
+                        Preferences.setWeeklyResetHour(newValue)
+                    }
+                }
+
+                Text("Owl não sabe o dia real em que o limite semanal da sua conta reinicia. Informe aqui o mesmo dia/horário mostrado em \"/usage\" no Claude Code para a barra semanal virar em sincronia com ele.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

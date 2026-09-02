@@ -30,16 +30,20 @@ enum TokenUsageService {
         /// renders as an empty bar rather than a full or missing one.
         var windowStart: Date?
 
-        /// Tokens spent since the start of the current calendar week.
+        /// Tokens spent since the start of the current weekly window.
         ///
         /// Claude Code's own weekly limit resets on a per-account schedule
-        /// that isn't recorded in the transcripts, so this is the calendar
-        /// week in the user's current locale — close enough to answer "how
-        /// heavy has this week been", but deliberately not claiming to
-        /// mirror the plan's exact reset instant.
+        /// that isn't recorded in the transcripts, so by default this is
+        /// just the calendar week in the user's current locale — close
+        /// enough to answer "how heavy has this week been", but not
+        /// claiming to mirror the plan's exact reset instant. Setting
+        /// `Preferences.weeklyResetWeekday`/`weeklyResetHour` (to whatever
+        /// day/time Claude Code's own `/usage` panel reports) anchors this
+        /// to that instant instead — see `weekInterval(weekResetWeekday:
+        /// weekResetHour:now:)`.
         var weekTokens: Int
-        /// Start of the *next* calendar week — i.e. when `weekTokens`
-        /// rolls back to zero. `nil` only on the empty snapshot.
+        /// Start of the *next* weekly window — i.e. when `weekTokens` rolls
+        /// back to zero. `nil` only on the empty snapshot.
         var weekEnd: Date?
 
         var windowEnd: Date? {
@@ -94,9 +98,14 @@ enum TokenUsageService {
     /// Scans every `.jsonl` transcript under `projectsRoot`, groups the
     /// assistant turns into 5-hour windows, and returns the one still open
     /// at `now`.
-    static func scan(projectsRoot: URL = defaultProjectsRoot, now: Date = Date()) -> Snapshot {
+    static func scan(
+        projectsRoot: URL = defaultProjectsRoot,
+        weekResetWeekday: Int? = Preferences.weeklyResetWeekday(),
+        weekResetHour: Int = Preferences.weeklyResetHour(),
+        now: Date = Date()
+    ) -> Snapshot {
         let turns = dedupe(collectTurns(projectsRoot: projectsRoot))
-        return snapshot(fromTurns: turns, now: now)
+        return snapshot(fromTurns: turns, weekResetWeekday: weekResetWeekday, weekResetHour: weekResetHour, now: now)
     }
 
     private static func collectTurns(projectsRoot: URL) -> [Turn] {
@@ -196,12 +205,16 @@ enum TokenUsageService {
     /// lines up with what the CLI tells you about your limits. It closes
     /// `windowDuration` later, or as soon as `windowDuration` passes with
     /// no turns at all.
-    private static func snapshot(fromTurns turns: [Turn], now: Date) -> Snapshot {
+    private static func snapshot(
+        fromTurns turns: [Turn],
+        weekResetWeekday: Int?,
+        weekResetHour: Int,
+        now: Date
+    ) -> Snapshot {
         guard !turns.isEmpty else { return .zero }
         let sorted = turns.sorted { $0.timestamp < $1.timestamp }
 
-        let calendar = Calendar.current
-        let weekInterval = calendar.dateInterval(of: .weekOfYear, for: now)
+        let weekInterval = weekInterval(weekResetWeekday: weekResetWeekday, weekResetHour: weekResetHour, now: now)
         let weekTokens = weekInterval.map { interval in
             sorted.filter { $0.timestamp >= interval.start }.reduce(0) { $0 + $1.tokens }
         } ?? 0
@@ -238,6 +251,37 @@ enum TokenUsageService {
             weekTokens: weekTokens,
             weekEnd: weekInterval?.end
         )
+    }
+
+    /// The weekly window containing `now`: from `weekResetWeekday`/
+    /// `weekResetHour` (local time) at or just before `now`, to the same
+    /// instant seven days later. `weekResetWeekday == nil` (the default —
+    /// no reset day configured in Preferences) falls back to the plain
+    /// calendar week, matching Owl's original behavior before this was
+    /// configurable.
+    private static func weekInterval(weekResetWeekday: Int?, weekResetHour: Int, now: Date) -> DateInterval? {
+        let calendar = Calendar.current
+        guard let weekResetWeekday else {
+            return calendar.dateInterval(of: .weekOfYear, for: now)
+        }
+
+        var components = DateComponents()
+        components.weekday = weekResetWeekday
+        components.hour = weekResetHour
+        components.minute = 0
+        components.second = 0
+
+        guard
+            let start = calendar.nextDate(
+                after: now,
+                matching: components,
+                matchingPolicy: .nextTimePreservingSmallerComponents,
+                direction: .backward
+            ),
+            let end = calendar.date(byAdding: .day, value: 7, to: start)
+        else { return nil }
+
+        return DateInterval(start: start, end: end)
     }
 
     private static func floorToHour(_ date: Date) -> Date {

@@ -10,6 +10,22 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+### Added
+
+- A "Reinício semanal" setting in Preferences: pick the weekday/hour
+  Claude Code's own `/usage` panel shows as your account's reset, and the
+  notch's weekly bar rolls over on that instant instead of the plain
+  calendar week. Left on "Automático" it behaves exactly as before —
+  Owl still has no way to read your account's real reset schedule, so
+  this only helps once you tell it what that schedule is.
+
+### Fixed
+
+- The weekly bar's reset day/time no longer silently follows the Mac's
+  system Region setting (`Calendar.current`'s `firstWeekday`), which could
+  disagree with the day Claude Code's own `/usage` panel reports for the
+  same account. Reported as "custo semanal com data errada".
+
 ## [0.18.0] - 2026-08-18
 
 ### Added

@@ -72,6 +72,11 @@ final class TokenUsageStore: ObservableObject {
                 guard let self else { return }
                 self.windowBudget = Preferences.tokenWindowBudget(defaults: self.defaults)
                 self.weeklyBudget = Preferences.weeklyTokenBudget(defaults: self.defaults)
+                // Budgets alone don't need a rescan — they're just the bar's
+                // denominator. The weekly reset day/hour changes the actual
+                // `weekTokens`/`weekEnd` computation, so it needs one to show
+                // up before the next scheduled tick.
+                self.refresh()
             }
         }
     }
@@ -87,8 +92,14 @@ final class TokenUsageStore: ObservableObject {
         guard !isScanning else { return }
         isScanning = true
         let root = projectsRoot
+        let weekResetWeekday = Preferences.weeklyResetWeekday(defaults: defaults)
+        let weekResetHour = Preferences.weeklyResetHour(defaults: defaults)
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let result = TokenUsageService.scan(projectsRoot: root)
+            let result = TokenUsageService.scan(
+                projectsRoot: root,
+                weekResetWeekday: weekResetWeekday,
+                weekResetHour: weekResetHour
+            )
             Task { @MainActor in
                 self?.isScanning = false
                 self?.snapshot = result
