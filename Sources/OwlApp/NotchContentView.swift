@@ -379,8 +379,11 @@ struct NotchContentView: View {
                         // the pill around it. Filling the header and
                         // stamping a rectangle over it makes the whole
                         // notch-sized area clickable, which is what it
-                        // looks like it should be.
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // looks like it should be. Once expanded, the
+                        // width is capped back to the physical notch so the
+                        // "ears" around the info/moon/xmark buttons aren't
+                        // a collapse target too (GH issue #54).
+                        .frame(maxWidth: effectiveExpanded ? store.notchWidth : .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

@@ -25,6 +25,10 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
+- Once the panel is expanded, the header's collapse target is limited to
+  the physical notch again, so clicks near the info/moon/xmark buttons no
+  longer collapse the panel by accident
+  ([#54](https://github.com/luanhssa/owl-notch/issues/54)).
 
 ## [0.18.0] - 2026-08-18
 
