@@ -204,17 +204,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func expandedContentHeight() -> CGFloat {
         let sessions = sessionStore.sortedSessions
-        // The token-usage row (see `TokenUsageRowView`) is always shown
-        // once expanded, independent of whether there are any sessions —
-        // it's added outside `min(...)` below since it's a fixed single
-        // row, not part of the scrollable/capped session list.
+        // The token-usage row (see `TokenUsageRowView`) is opt-in
+        // (`Preferences.showTokenUsage`); when on, it's shown once expanded
+        // independent of whether there are any sessions — it's added
+        // outside `min(...)` below since it's a fixed single row, not part
+        // of the scrollable/capped session list.
         // `dividerHeight * 3` accounts for the header divider plus the two
         // bracketing the usage row — all three sit outside the
         // `ScrollView`, so (unlike the dividers between individual
         // sessions, which the ScrollView's own clipping absorbs) omitting
         // them here really did make the panel's AppKit frame a few points
-        // shorter than its actual SwiftUI content.
-        let usageHeight = NotchLayout.tokenUsageRowHeight + NotchLayout.dividerHeight * 3
+        // shorter than its actual SwiftUI content. With the row hidden,
+        // only the header divider is left.
+        let usageHeight = tokenUsageStore.isEnabled
+            ? NotchLayout.tokenUsageRowHeight + NotchLayout.dividerHeight * 3
+            : NotchLayout.dividerHeight
         guard !sessions.isEmpty else { return 40 + usageHeight }
 
         var content: CGFloat = 0
@@ -234,18 +238,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sessionStore.$expandedSessionID,
             sessionStore.$frontmostBundleIdentifier
         )
-        // `tokenUsageStore.$snapshot` chained on rather than folded into a
+        // `tokenUsageStore.$isEnabled` chained on rather than folded into a
         // `CombineLatest5` — Combine only ships `CombineLatest` operators up
         // to 4 publishers as a single struct; chaining `.combineLatest` is
         // the standard way past that, not a sign this should be split up.
-        // `.removeDuplicates()` matters here specifically: `snapshot`
-        // republishes every ~30s regardless of whether the numbers
-        // actually changed, and the computed frame doesn't depend on its
-        // value at all (`expandedContentHeight()` uses a flat
-        // `tokenUsageRowHeight` constant) — without this, every tick
-        // triggered a real, animated, no-op `resizePanel()` (found during
-        // #49's review).
-        .combineLatest(tokenUsageStore.$snapshot.removeDuplicates())
+        // It's `isEnabled`, not `snapshot`, because only whether the usage
+        // row is shown changes the frame — `expandedContentHeight()` uses
+        // a flat `tokenUsageRowHeight` constant, and observing `snapshot`
+        // made every 30s tick trigger an animated, no-op `resizePanel()`
+        // (found during #49's review).
+        .combineLatest(tokenUsageStore.$isEnabled.removeDuplicates())
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _, _ in
             self?.resizePanel()

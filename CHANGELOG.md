@@ -19,6 +19,14 @@ semver's own rule for pre-1.0 releases.
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
 
+### Changed
+
+- The token-usage bars are now opt-in ("Mostrar barras de uso no notch"
+  in Preferences, off by default). With guessed budgets they rarely
+  matched `/usage` and mostly cost notch height; while off, the row is
+  hidden, the panel is that much shorter, and no transcript scan runs.
+  The budget/reset settings only show once the bars are turned on.
+
 ### Fixed
 
 - The weekly bar's reset day/time no longer silently follows the Mac's
