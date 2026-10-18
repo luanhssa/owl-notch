@@ -19,6 +19,11 @@ semver's own rule for pre-1.0 releases.
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
 
+### Changed
+
+- The Preferences window scrolls instead of growing past the screen, so
+  every section stays reachable on a laptop display.
+
 ### Fixed
 
 - The weekly bar's reset day/time no longer silently follows the Mac's
