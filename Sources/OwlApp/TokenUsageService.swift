@@ -176,14 +176,26 @@ enum TokenUsageService {
     /// `message.id` + `requestId` together identify one real API response
     /// — mirrors the dedup key other local Claude Code usage tools (e.g.
     /// ccusage) use for the same reason. When either is missing (an
-    /// older/newer transcript format, a malformed line), falls back to a
-    /// (timestamp, model, tokens) composite rather than skipping dedup
-    /// entirely for exactly the atypical lines where duplication is most
-    /// likely (found during #49's review) — narrower than the real key,
-    /// but still catches an exact repeat.
+    /// older/newer transcript format, a malformed line), falls back in two
+    /// steps rather than skipping dedup entirely for exactly the atypical
+    /// lines where duplication is most likely (found during #49's review):
+    ///
+    /// 1. The line's own `uuid` — every transcript line Claude Code writes
+    ///    carries one, and a resumed/compacted session that copies a line
+    ///    into a new file keeps it. Unlike the composite below, two
+    ///    *different* turns never share it, so it can't merge them (GH
+    ///    issue #53). Assumed from the transcript format, not documented
+    ///    by Claude Code — hence still a fallback, not the primary key.
+    /// 2. A (timestamp, model, tokens) composite, only for a line with no
+    ///    `uuid` either — narrower than the real key, and two distinct
+    ///    turns landing on the same second/model/total would collide, but
+    ///    it still catches an exact repeat.
     private static func dedupKey(json: [String: Any], message: [String: Any], timestamp: Date, tokens: Int) -> String {
         if let messageID = message["id"] as? String, let requestID = json["requestId"] as? String {
             return "\(messageID)|\(requestID)"
+        }
+        if let uuid = json["uuid"] as? String, !uuid.isEmpty {
+            return "uuid|\(uuid)"
         }
         let model = message["model"] as? String ?? ""
         return "fallback|\(timestamp.timeIntervalSince1970)|\(model)|\(tokens)"

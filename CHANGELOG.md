@@ -25,6 +25,10 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
+- Token-usage dedup for transcript lines missing `message.id`/`requestId`
+  now keys on the line's own `uuid` before falling back to
+  timestamp+model+tokens, so two different turns that share those three
+  are no longer merged into one ([#53](https://github.com/luanhssa/owl-notch/issues/53)).
 
 ## [0.18.0] - 2026-08-18
 
