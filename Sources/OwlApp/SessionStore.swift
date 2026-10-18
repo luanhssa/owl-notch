@@ -87,6 +87,11 @@ struct SessionInfo: Identifiable, Codable {
     /// genuinely sensitive content, so it shouldn't linger on disk between
     /// relaunches the way the rest of a session's metadata does.
     var lastMessageContent: String?
+    /// How full this session's context window is, opt-in via Preferences
+    /// and off by default (GH issue #42). Also left out of `CodingKeys` —
+    /// not sensitive, but stale the moment it's persisted, and refreshed
+    /// on the session's next hook event anyway.
+    var contextUsage: ContextUsageService.Usage?
 
     var id: String { sessionID }
 
@@ -525,6 +530,11 @@ final class SessionStore: ObservableObject {
             // user turns this off (GH issue #45).
             info.lastMessageContent = nil
         }
+        if Preferences.showContextUsage(defaults: defaults) {
+            kickOffContextUsageLookupIfNeeded(sessionID: sessionID, transcriptPath: input.transcriptPath)
+        } else if info.contextUsage != nil {
+            info.contextUsage = nil
+        }
 
         sessions[sessionID] = info
         enforceSessionCap()
@@ -539,6 +549,7 @@ final class SessionStore: ObservableObject {
     private var pendingTitleLookups: Set<String> = []
     private var pendingGitBranchLookups: Set<String> = []
     private var pendingLastMessageLookups: Set<String> = []
+    private var pendingContextUsageLookups: Set<String> = []
 
     /// Moves `SessionTitleService`'s transcript read off the main actor
     /// (GH issue #24, phase 3) — `SidebarTitleService`'s own tree scan was
@@ -604,6 +615,26 @@ final class SessionStore: ObservableObject {
                 info.lastMessageContent = content
                 sessions[sessionID] = info
                 schedulePersist()
+            }
+        }
+    }
+
+    /// Same shape and same post-hop preference recheck as
+    /// `kickOffLastMessageLookupIfNeeded`, for `ContextUsageService`'s
+    /// transcript read (GH issue #42) — also refreshed on every event,
+    /// since context grows every turn. Not persisted, so no
+    /// `schedulePersist()`.
+    private func kickOffContextUsageLookupIfNeeded(sessionID: String, transcriptPath: String?) {
+        guard !pendingContextUsageLookups.contains(sessionID) else { return }
+        pendingContextUsageLookups.insert(sessionID)
+        Task.detached { [weak self] in
+            let usage = ContextUsageService.usage(transcriptPath: transcriptPath)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                pendingContextUsageLookups.remove(sessionID)
+                guard Preferences.showContextUsage(defaults: defaults), var info = sessions[sessionID] else { return }
+                info.contextUsage = usage
+                sessions[sessionID] = info
             }
         }
     }

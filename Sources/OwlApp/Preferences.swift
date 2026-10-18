@@ -13,6 +13,7 @@ enum Preferences {
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
+    private static let showContextUsageKey = "owl.showContextUsage"
     private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
     private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
     private static let weeklyResetWeekdayKey = "owl.weeklyResetWeekday"
@@ -89,6 +90,19 @@ enum Preferences {
 
     static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: showLastMessageContentKey)
+    }
+
+    /// Off by default (GH issue #42) — shows how full each session's
+    /// context window is in its expanded row. Costs one extra transcript
+    /// tail-read per hook event, and the window size is inferred rather
+    /// than read (see `ContextUsageService.limit(for:)`), so it's opt-in
+    /// the same way the usage bars are.
+    static func showContextUsage(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showContextUsageKey) as? Bool ?? false
+    }
+
+    static func setShowContextUsage(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showContextUsageKey)
     }
 
     /// The ceiling the notch's usage bar fills against. Claude Code doesn't

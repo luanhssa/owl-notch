@@ -43,6 +43,7 @@ struct PreferencesView: View {
     @State private var loginItemEnabled: Bool
     @State private var preferredDisplayID: CGDirectDisplayID?
     @State private var showLastMessageContent: Bool
+    @State private var showContextUsage: Bool
     /// Held in millions rather than raw tokens: the range spans hundreds of
     /// millions, so a raw-token `Slider` would step in amounts too small to
     /// ever reach the other end, and the label would be unreadable.
@@ -68,6 +69,7 @@ struct PreferencesView: View {
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
+        _showContextUsage = State(initialValue: Preferences.showContextUsage())
         _tokenWindowBudgetMillions = State(initialValue: Double(Preferences.tokenWindowBudget()) / 1_000_000)
         _weeklyTokenBudgetMillions = State(initialValue: Double(Preferences.weeklyTokenBudget()) / 1_000_000)
         _weeklyResetWeekday = State(initialValue: Preferences.weeklyResetWeekday())
@@ -163,6 +165,14 @@ struct PreferencesView: View {
                         Preferences.setShowLastMessageContent(newValue)
                     }
                 Text("Desligado por padrão: mostra o texto real da última mensagem/resultado em vez de só o nome da ferramenta — conteúdo da conversa, possivelmente sensível, numa tela sempre visível.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Mostrar o uso do contexto de cada sessão", isOn: $showContextUsage)
+                    .onChange(of: showContextUsage) { newValue in
+                        Preferences.setShowContextUsage(newValue)
+                    }
+                Text("Desligado por padrão: mostra, na sessão expandida, quanto da janela de contexto já foi usado. O tamanho da janela é estimado (200k, ou 1M quando a sessão já passou disso).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

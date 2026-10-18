@@ -70,6 +70,15 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences.showLastMessageContent(defaults: defaults))
     }
 
+    func testShowContextUsageDefaultsToFalseWhenUnset() {
+        XCTAssertFalse(Preferences.showContextUsage(defaults: defaults))
+    }
+
+    func testShowContextUsageRoundTrips() {
+        Preferences.setShowContextUsage(true, defaults: defaults)
+        XCTAssertTrue(Preferences.showContextUsage(defaults: defaults))
+    }
+
     func testTokenWindowBudgetDefaultsWhenUnset() {
         XCTAssertEqual(Preferences.tokenWindowBudget(defaults: defaults), Preferences.defaultTokenWindowBudget)
     }

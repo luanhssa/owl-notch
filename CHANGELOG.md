@@ -18,6 +18,12 @@ semver's own rule for pre-1.0 releases.
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
+- An opt-in (off by default) context-window line in each session's
+  expanded row — "contexto: 45% · 90k de 200k", read from the last
+  assistant turn in the session's transcript
+  ([#42](https://github.com/luanhssa/owl-notch/issues/42), partial — cost
+  is still open). The window size is inferred: 200k, or 1M once a session
+  is already past 200k.
 
 ### Fixed
 

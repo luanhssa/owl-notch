@@ -222,6 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             content += NotchLayout.collapsedRowHeight
             if sessionStore.expandedSessionID == session.sessionID {
                 content += NotchLayout.accordionDetailExtraHeight
+                if session.contextUsage != nil {
+                    content += NotchLayout.contextUsageLineHeight
+                }
             }
         }
         return usageHeight + min(content, NotchLayout.expandedListMaxHeight)
