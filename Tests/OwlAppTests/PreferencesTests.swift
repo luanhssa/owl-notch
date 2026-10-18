@@ -7,7 +7,9 @@ final class PreferencesTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "owl-test-\(UUID().uuidString)"
+        // Fixed name, cleared up front — see SessionStoreTests (GH issue #56).
+        suiteName = "owl-tests.Preferences"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         defaults = UserDefaults(suiteName: suiteName)
     }
 
