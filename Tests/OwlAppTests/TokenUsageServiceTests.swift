@@ -431,4 +431,47 @@ final class TokenUsageServiceTests: XCTestCase {
 
         XCTAssertEqual(snapshot.windowTokens, 50, "an exact repeat with no id/requestId should still be deduplicated via the fallback key")
     }
+
+    /// A transcript bigger than one read chunk (1MB) is read in pieces,
+    /// so lines straddling a chunk boundary must still be stitched back
+    /// together and counted exactly once (GH issue #51).
+    func testCountsEveryTurnInAFileLargerThanOneReadChunk() throws {
+        let padding = String(repeating: "x", count: 600)
+        let lineCount = 3_000
+        let lines = (0..<lineCount).map { _ -> String in
+            let json: [String: Any] = [
+                "type": "assistant",
+                "timestamp": iso(referenceNow),
+                "requestId": UUID().uuidString,
+                "padding": padding,
+                "message": ["id": UUID().uuidString, "usage": ["input_tokens": 1, "output_tokens": 0]],
+            ]
+            let data = try! JSONSerialization.data(withJSONObject: json)
+            return String(data: data, encoding: .utf8)!
+        }
+        try writeTranscript(lines, to: "project-a/big-session.jsonl")
+        let size = try root.appendingPathComponent("project-a/big-session.jsonl").resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        XCTAssertGreaterThan(size, 1024 * 1024, "the fixture must actually span more than one chunk")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, lineCount)
+    }
+
+    /// The last line of a file still counts when it has no trailing
+    /// newline — the chunked reader only splits on newlines, so the tail
+    /// is handled separately.
+    func testCountsALastLineWithoutATrailingNewline() throws {
+        let url = root.appendingPathComponent("project-a/session-1.jsonl")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let content = [
+            assistantLine(timestamp: iso(referenceNow), inputTokens: 10, outputTokens: 0),
+            assistantLine(timestamp: iso(referenceNow), inputTokens: 20, outputTokens: 0),
+        ].joined(separator: "\n")
+        try content.write(to: url, atomically: true, encoding: .utf8)
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 30)
+    }
 }

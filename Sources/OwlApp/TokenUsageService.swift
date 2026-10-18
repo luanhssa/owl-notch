@@ -145,32 +145,66 @@ enum TokenUsageService {
         return allTurns
     }
 
+    /// How much of a transcript is read per `FileHandle` call. Reading in
+    /// chunks keeps a scan's peak memory at about this size plus the
+    /// longest single line, instead of the whole file — a long session
+    /// with big embedded tool outputs can run to hundreds of MB (GH issue
+    /// #51). Unlike `SessionTitleService.maxBytesRead`, this isn't a cap:
+    /// every turn in the file has to be counted, so the whole file is
+    /// still read, just never all at once.
+    private static let readChunkSize = 1024 * 1024
+    private static let newline = UInt8(ascii: "\n")
+
     private static func parseTurns(fileURL: URL) -> [Turn] {
-        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return [] }
-        let text = String(decoding: data, as: UTF8.self)
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return [] }
+        defer { try? handle.close() }
 
         var turns: [Turn] = []
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            guard
-                let lineData = line.data(using: .utf8),
-                let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                json["type"] as? String == "assistant",
-                let message = json["message"] as? [String: Any],
-                let usage = message["usage"] as? [String: Any]
-            else { continue }
+        // Bytes of a line that started in an earlier chunk but hasn't hit
+        // its newline yet.
+        var pending = Data()
+        while true {
+            let chunk = handle.readData(ofLength: readChunkSize)
+            if chunk.isEmpty { break }
+            pending.append(chunk)
 
-            let tokens = tokenCount(fromUsage: usage)
-            guard tokens > 0 else { continue }
-
-            guard
-                let timestampString = json["timestamp"] as? String,
-                let timestamp = isoFormatter.date(from: timestampString) ?? isoFormatterNoFraction.date(from: timestampString)
-            else { continue }
-
-            let key = dedupKey(json: json, message: message, timestamp: timestamp, tokens: tokens)
-            turns.append(Turn(dedupKey: key, timestamp: timestamp, tokens: tokens))
+            var lineStart = pending.startIndex
+            while let lineEnd = pending[lineStart...].firstIndex(of: newline) {
+                if let turn = parseTurn(lineData: pending[lineStart..<lineEnd]) {
+                    turns.append(turn)
+                }
+                lineStart = pending.index(after: lineEnd)
+            }
+            // Re-based copy so `pending`'s indices start at 0 again rather
+            // than growing with every chunk.
+            pending = Data(pending[lineStart...])
+        }
+        // A last line with no trailing newline.
+        if let turn = parseTurn(lineData: pending) {
+            turns.append(turn)
         }
         return turns
+    }
+
+    private static func parseTurn(lineData: Data) -> Turn? {
+        guard
+            !lineData.isEmpty,
+            let json = try? JSONSerialization.jsonObject(with: Data(lineData)) as? [String: Any],
+            json["type"] as? String == "assistant",
+            let message = json["message"] as? [String: Any],
+            let usage = message["usage"] as? [String: Any]
+        else { return nil }
+
+        let tokens = tokenCount(fromUsage: usage)
+        guard tokens > 0 else { return nil }
+
+        guard
+            let timestampString = json["timestamp"] as? String,
+            let timestamp = isoFormatter.date(from: timestampString) ?? isoFormatterNoFraction.date(from: timestampString)
+        else { return nil }
+
+        let key = dedupKey(json: json, message: message, timestamp: timestamp, tokens: tokens)
+        return Turn(dedupKey: key, timestamp: timestamp, tokens: tokens)
     }
 
     /// `message.id` + `requestId` together identify one real API response
