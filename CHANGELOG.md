@@ -18,6 +18,10 @@ semver's own rule for pre-1.0 releases.
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
+- An opt-in (off by default) weekly check for a newer GitHub release,
+  in Preferences > Geral. When one exists, the About panel says so and
+  links to it — installing is still manual
+  ([#46](https://github.com/luanhssa/owl-notch/issues/46), phase 1).
 
 ### Fixed
 

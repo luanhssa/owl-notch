@@ -70,6 +70,22 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences.showLastMessageContent(defaults: defaults))
     }
 
+    func testCheckForUpdatesDefaultsToFalseWhenUnset() {
+        XCTAssertFalse(Preferences.checkForUpdates(defaults: defaults))
+    }
+
+    func testCheckForUpdatesRoundTrips() {
+        Preferences.setCheckForUpdates(true, defaults: defaults)
+        XCTAssertTrue(Preferences.checkForUpdates(defaults: defaults))
+    }
+
+    func testLastUpdateCheckRoundTrips() {
+        XCTAssertNil(Preferences.lastUpdateCheck(defaults: defaults))
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        Preferences.setLastUpdateCheck(date, defaults: defaults)
+        XCTAssertEqual(Preferences.lastUpdateCheck(defaults: defaults), date)
+    }
+
     func testTokenWindowBudgetDefaultsWhenUnset() {
         XCTAssertEqual(Preferences.tokenWindowBudget(defaults: defaults), Preferences.defaultTokenWindowBudget)
     }
