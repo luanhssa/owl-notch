@@ -84,6 +84,9 @@ enum TokenUsageService {
     /// one background scan if a future caller doesn't serialize them.
     private static let lock = NSLock()
     private static var cache: [String: CacheEntry] = [:]
+    /// Which `cache` keys each scanned root produced on its last scan —
+    /// what eviction diffs against (GH issue #52). Guarded by `lock`.
+    private static var pathsByRoot: [String: Set<String>] = [:]
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -116,6 +119,7 @@ enum TokenUsageService {
         ) else { return [] }
 
         var allTurns: [Turn] = []
+        var seenPaths: Set<String> = []
 
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl" else { continue }
@@ -126,6 +130,7 @@ enum TokenUsageService {
             else { continue }
 
             let path = url.path
+            seenPaths.insert(path)
             lock.lock()
             let cached = cache[path]
             lock.unlock()
@@ -142,7 +147,31 @@ enum TokenUsageService {
             allTurns.append(contentsOf: turns)
         }
 
+        // Drop entries for transcripts under this root that weren't seen
+        // this scan (deleted or moved), so the cache tracks what's on disk
+        // rather than every file ever seen since launch (GH issue #52).
+        // Scoped per `projectsRoot` (via the paths that root produced last
+        // time) because the cache is shared across roots — tests scan
+        // their own temporary ones — and comparing enumerator paths
+        // against a root-path prefix would be fragile under symlinked
+        // locations like macOS's /var → /private/var.
+        lock.lock()
+        let previousPaths = pathsByRoot[projectsRoot.path] ?? []
+        for path in previousPaths.subtracting(seenPaths) {
+            cache[path] = nil
+        }
+        pathsByRoot[projectsRoot.path] = seenPaths
+        lock.unlock()
+
         return allTurns
+    }
+
+    /// Test-only view into the per-file cache, so eviction (GH issue #52)
+    /// can be asserted without exposing the cache itself.
+    static func cachedPaths() -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return Set(cache.keys)
     }
 
     private static func parseTurns(fileURL: URL) -> [Turn] {

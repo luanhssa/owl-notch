@@ -25,6 +25,9 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
+- The token-usage per-file cache drops entries for transcripts that were
+  deleted or moved instead of keeping them for the life of the process
+  ([#52](https://github.com/luanhssa/owl-notch/issues/52)).
 
 ## [0.18.0] - 2026-08-18
 
