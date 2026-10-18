@@ -18,6 +18,11 @@ semver's own rule for pre-1.0 releases.
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
+- Releases: pushing a `vX.Y.Z` tag now builds `Owl.app` + `owl-hook` on
+  CI and publishes them as a GitHub Release zip, with that version's
+  CHANGELOG section as notes, so Owl can be installed without building
+  from source ([#46](https://github.com/luanhssa/owl-notch/issues/46),
+  phase 1).
 
 ### Fixed
 
