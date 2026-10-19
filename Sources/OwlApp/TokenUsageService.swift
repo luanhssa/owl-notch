@@ -163,21 +163,36 @@ enum TokenUsageService {
         // Bytes of a line that started in an earlier chunk but hasn't hit
         // its newline yet.
         var pending = Data()
+        // How far into `pending` is already known to hold no newline, so a
+        // single line spanning many chunks isn't rescanned from its start
+        // on every chunk.
+        var searchFrom = 0
         while true {
-            let chunk = handle.readData(ofLength: readChunkSize)
-            if chunk.isEmpty { break }
-            pending.append(chunk)
+            // Each chunk, and the JSON objects parsed from it, are
+            // autoreleased; without a pool per chunk they'd pile up until
+            // the whole file had been read, defeating the chunking.
+            let reachedEnd: Bool = autoreleasepool {
+                // `read(upToCount:)` throws on an I/O error, where
+                // `readData(ofLength:)` would raise an uncatchable exception.
+                guard let chunk = try? handle.read(upToCount: readChunkSize), !chunk.isEmpty else { return true }
+                pending.append(chunk)
 
-            var lineStart = pending.startIndex
-            while let lineEnd = pending[lineStart...].firstIndex(of: newline) {
-                if let turn = parseTurn(lineData: pending[lineStart..<lineEnd]) {
-                    turns.append(turn)
+                var lineStart = pending.startIndex
+                var searchStart = pending.startIndex + searchFrom
+                while let lineEnd = pending[searchStart...].firstIndex(of: newline) {
+                    if let turn = parseTurn(lineData: pending[lineStart..<lineEnd]) {
+                        turns.append(turn)
+                    }
+                    lineStart = pending.index(after: lineEnd)
+                    searchStart = lineStart
                 }
-                lineStart = pending.index(after: lineEnd)
+                // Re-based copy so `pending`'s indices start at 0 again rather
+                // than growing with every chunk.
+                pending = Data(pending[lineStart...])
+                searchFrom = pending.count
+                return false
             }
-            // Re-based copy so `pending`'s indices start at 0 again rather
-            // than growing with every chunk.
-            pending = Data(pending[lineStart...])
+            if reachedEnd { break }
         }
         // A last line with no trailing newline.
         if let turn = parseTurn(lineData: pending) {
