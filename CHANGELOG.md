@@ -10,6 +10,8 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-19
+
 ### Added
 
 - A "Reinício semanal" setting in Preferences: pick the weekday/hour
