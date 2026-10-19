@@ -12,12 +12,43 @@ semver's own rule for pre-1.0 releases.
 
 ### Added
 
+- An opt-in (off by default) context-window line in each session's
+  expanded row — "contexto: 45% · 90k de 200k", read from the last
+  assistant turn in the session's transcript
+  ([#42](https://github.com/luanhssa/owl-notch/issues/42), partial — cost
+  is still open). Transcripts don't say which window a session runs
+  with, so a "Janela de contexto" setting picks it: 200k, 1M, or
+  "Automático" (200k until a session is already past it).
+
+### Fixed
+
+- Token usage reads each transcript in 1MB chunks instead of loading the
+  whole file into memory at once, so one huge session file no longer
+  spikes Owl's memory — about 34MB at peak for a 300MB transcript, down
+  from over 900MB ([#51](https://github.com/luanhssa/owl-notch/issues/51)).
+- The token-usage per-file cache drops entries for transcripts that were
+  deleted or moved instead of keeping them for the life of the process
+  ([#52](https://github.com/luanhssa/owl-notch/issues/52)).
+
+## [0.19.0] - 2026-10-19
+
+### Added
+
 - A "Reinício semanal" setting in Preferences: pick the weekday/hour
   Claude Code's own `/usage` panel shows as your account's reset, and the
   notch's weekly bar rolls over on that instant instead of the plain
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
+- Releases: pushing a `vX.Y.Z` tag now builds `Owl.app` + `owl-hook` on
+  CI and publishes them as a GitHub Release zip, with that version's
+  CHANGELOG section as notes, so Owl can be installed without building
+  from source ([#46](https://github.com/luanhssa/owl-notch/issues/46),
+  phase 1).
+- An opt-in (off by default) weekly check for a newer GitHub release,
+  in Preferences > Geral. When one exists, the About panel says so and
+  links to it — installing is still manual
+  ([#46](https://github.com/luanhssa/owl-notch/issues/46), phase 1).
 
 ### Fixed
 
@@ -25,9 +56,6 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
-- The token-usage per-file cache drops entries for transcripts that were
-  deleted or moved instead of keeping them for the life of the process
-  ([#52](https://github.com/luanhssa/owl-notch/issues/52)).
 
 ## [0.18.0] - 2026-08-18
 

@@ -276,6 +276,13 @@ struct SessionRowView: View {
                             .font(.system(size: NotchStyle.captionFontSize))
                             .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                     }
+                    // Opt-in (GH issue #42) — see Preferences' "Mostrar o
+                    // uso do contexto de cada sessão".
+                    if let usage = session.contextUsage {
+                        Text("contexto: \(Int((usage.fraction * 100).rounded()))% · \(usage.tokens / 1_000)k de \(ContextUsageService.windowLabel(usage.limit))")
+                            .font(.system(size: NotchStyle.captionFontSize))
+                            .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
+                    }
                     // Opt-in richer content (GH issue #45) takes priority
                     // over the terse tool-name summary when present — see
                     // Preferences' "Mostrar o conteúdo da última mensagem".
