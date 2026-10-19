@@ -15,6 +15,8 @@ enum Preferences {
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
     private static let checkForUpdatesKey = "owl.checkForUpdates"
     private static let lastUpdateCheckKey = "owl.lastUpdateCheck"
+    private static let latestKnownReleaseVersionKey = "owl.latestKnownReleaseVersion"
+    private static let latestKnownReleaseURLKey = "owl.latestKnownReleaseURL"
     private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
     private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
     private static let weeklyResetWeekdayKey = "owl.weeklyResetWeekday"
@@ -112,6 +114,23 @@ enum Preferences {
 
     static func setLastUpdateCheck(_ date: Date, defaults: UserDefaults = .standard) {
         defaults.set(date, forKey: lastUpdateCheckKey)
+    }
+
+    /// The release the last successful update check found. Kept so the
+    /// About panel's notice survives a relaunch (or the check being turned
+    /// off and on) during the week no new check is due.
+    static func latestKnownRelease(defaults: UserDefaults = .standard) -> UpdateCheckService.Release? {
+        guard
+            let version = defaults.string(forKey: latestKnownReleaseVersionKey),
+            let page = defaults.string(forKey: latestKnownReleaseURLKey),
+            let pageURL = URL(string: page)
+        else { return nil }
+        return UpdateCheckService.Release(version: version, pageURL: pageURL)
+    }
+
+    static func setLatestKnownRelease(_ release: UpdateCheckService.Release, defaults: UserDefaults = .standard) {
+        defaults.set(release.version, forKey: latestKnownReleaseVersionKey)
+        defaults.set(release.pageURL.absoluteString, forKey: latestKnownReleaseURLKey)
     }
 
     /// The ceiling the notch's usage bar fills against. Claude Code doesn't

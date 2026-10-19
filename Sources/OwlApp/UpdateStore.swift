@@ -55,9 +55,13 @@ final class UpdateStore: ObservableObject {
 
     private func checkIfDue() {
         guard Preferences.checkForUpdates(defaults: defaults) else {
-            availableUpdate = nil
+            showIfNewer(nil)
             return
         }
+        // Restore what the last successful check found, so a relaunch (or
+        // toggling the check off and on) inside the week before the next
+        // one is due doesn't hide a notice that's still true.
+        showIfNewer(Preferences.latestKnownRelease(defaults: defaults))
         guard !isChecking, UpdateCheckService.isCheckDue(lastCheck: Preferences.lastUpdateCheck(defaults: defaults)) else { return }
         isChecking = true
         Task { [weak self] in
@@ -67,9 +71,19 @@ final class UpdateStore: ObservableObject {
             // Only a successful fetch counts as a check — a failed one
             // retries at the next poll instead of waiting a whole week.
             guard let release else { return }
+            Preferences.setLatestKnownRelease(release, defaults: defaults)
             Preferences.setLastUpdateCheck(Date(), defaults: defaults)
             guard Preferences.checkForUpdates(defaults: defaults) else { return }
-            availableUpdate = UpdateCheckService.isNewer(release.version, than: currentVersion) ? release : nil
+            showIfNewer(release)
+        }
+    }
+
+    private func showIfNewer(_ release: UpdateCheckService.Release?) {
+        let update = release.flatMap { UpdateCheckService.isNewer($0.version, than: currentVersion) ? $0 : nil }
+        // Runs on every defaults change, so skip no-op writes that would
+        // still make `@Published` notify the About panel.
+        if availableUpdate != update {
+            availableUpdate = update
         }
     }
 }
