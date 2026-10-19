@@ -15,7 +15,9 @@ final class TokenUsageStoreTests: XCTestCase {
         // UserDefaults.
         root = FileManager.default.temporaryDirectory.appendingPathComponent("owl-token-store-test-\(UUID().uuidString)", isDirectory: true)
         try! FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        suiteName = "owl-test-\(UUID().uuidString)"
+        // Fixed name, cleared up front — see SessionStoreTests (GH issue #56).
+        suiteName = "owl-tests.TokenUsageStore"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         defaults = UserDefaults(suiteName: suiteName)
     }
 
@@ -110,7 +112,7 @@ final class TokenUsageStoreTests: XCTestCase {
     /// (rather than `object: nil`) actually isolates instances, which
     /// matters for test hygiene as much as production correctness.
     func testDoesNotReactToADifferentInstancesDefaults() async throws {
-        let otherSuiteName = "owl-test-other-\(UUID().uuidString)"
+        let otherSuiteName = "owl-tests.TokenUsageStore.other"
         let otherDefaults = UserDefaults(suiteName: otherSuiteName)
         defer { otherDefaults!.removePersistentDomain(forName: otherSuiteName) }
 

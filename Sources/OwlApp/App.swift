@@ -6,6 +6,7 @@ import Combine
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let sessionStore = SessionStore()
     let tokenUsageStore = TokenUsageStore()
+    let updateStore = UpdateStore()
     private var ipcServer: IPCServer!
     private var panel: NSPanel!
     private var aboutWindow: NSWindow?
@@ -140,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// only other UI surface it has (GH issue #37).
     private func showAboutWindow() {
         if aboutWindow == nil {
-            let view = AboutView(store: sessionStore, onShowPreferences: { [weak self] in
+            let view = AboutView(store: sessionStore, updateStore: updateStore, onShowPreferences: { [weak self] in
                 self?.showPreferencesWindow()
             })
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
@@ -226,6 +227,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             content += NotchLayout.collapsedRowHeight
             if sessionStore.expandedSessionID == session.sessionID {
                 content += NotchLayout.accordionDetailExtraHeight
+                if session.contextUsage != nil {
+                    content += NotchLayout.contextUsageLineHeight
+                }
             }
         }
         return usageHeight + min(content, NotchLayout.expandedListMaxHeight)

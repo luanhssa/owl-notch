@@ -10,6 +10,57 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+### Changed
+
+- The token-usage bars are now opt-in ("Mostrar barras de uso no notch"
+  in Preferences, off by default). With guessed budgets they rarely
+  matched `/usage` and mostly cost notch height; while off, the row is
+  hidden, the panel is that much shorter, and no transcript scan runs.
+  The budget/reset settings only show once the bars are turned on.
+
+### Fixed
+
+- Once the panel is expanded, the header's collapse target is limited to
+  the physical notch again, so clicks near the info/moon/xmark buttons no
+  longer collapse the panel by accident
+  ([#54](https://github.com/luanhssa/owl-notch/issues/54)).
+- `swift test` no longer leaves a new `owl-test-*.plist` in
+  `~/Library/Preferences` on every run — test suites use one fixed
+  `UserDefaults` name per test class
+  ([#56](https://github.com/luanhssa/owl-notch/issues/56)).
+
+## [0.20.0] - 2026-10-19
+
+### Added
+
+- An opt-in (off by default) context-window line in each session's
+  expanded row — "contexto: 45% · 90k de 200k", read from the last
+  assistant turn in the session's transcript
+  ([#42](https://github.com/luanhssa/owl-notch/issues/42), partial — cost
+  is still open). Transcripts don't say which window a session runs
+  with, so a "Janela de contexto" setting picks it: 200k, 1M, or
+  "Automático" (200k until a session is already past it).
+
+### Fixed
+
+- Token usage reads each transcript in 1MB chunks instead of loading the
+  whole file into memory at once, so one huge session file no longer
+  spikes Owl's memory — about 34MB at peak for a 300MB transcript, down
+  from over 900MB ([#51](https://github.com/luanhssa/owl-notch/issues/51)).
+- The token-usage per-file cache drops entries for transcripts that were
+  deleted or moved instead of keeping them for the life of the process
+  ([#52](https://github.com/luanhssa/owl-notch/issues/52)).
+- Token-usage dedup for transcript lines missing `message.id` or
+  `requestId` now keys on whichever of the two is left, then on the
+  line's own `uuid`, before the old timestamp+model+tokens fallback.
+  Claude Code writes one response as several lines that share both ids
+  but not their `uuid`s, so this counts it once instead of once per
+  line, and two different turns can no longer be merged just for sharing
+  a timestamp, model and token total
+  ([#53](https://github.com/luanhssa/owl-notch/issues/53)).
+
+## [0.19.0] - 2026-10-19
+
 ### Added
 
 - A "Reinício semanal" setting in Preferences: pick the weekday/hour
@@ -18,14 +69,15 @@ semver's own rule for pre-1.0 releases.
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
-
-### Changed
-
-- The token-usage bars are now opt-in ("Mostrar barras de uso no notch"
-  in Preferences, off by default). With guessed budgets they rarely
-  matched `/usage` and mostly cost notch height; while off, the row is
-  hidden, the panel is that much shorter, and no transcript scan runs.
-  The budget/reset settings only show once the bars are turned on.
+- Releases: pushing a `vX.Y.Z` tag now builds `Owl.app` + `owl-hook` on
+  CI and publishes them as a GitHub Release zip, with that version's
+  CHANGELOG section as notes, so Owl can be installed without building
+  from source ([#46](https://github.com/luanhssa/owl-notch/issues/46),
+  phase 1).
+- An opt-in (off by default) weekly check for a newer GitHub release,
+  in Preferences > Geral. When one exists, the About panel says so and
+  links to it — installing is still manual
+  ([#46](https://github.com/luanhssa/owl-notch/issues/46), phase 1).
 
 ### Fixed
 

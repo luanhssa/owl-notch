@@ -7,6 +7,7 @@ import SwiftUI
 /// header (see `NotchContentView`).
 struct AboutView: View {
     @ObservedObject var store: SessionStore
+    @ObservedObject var updateStore: UpdateStore
     let onShowPreferences: () -> Void
     @State private var showResetConfirmation = false
 
@@ -28,6 +29,23 @@ struct AboutView: View {
                     Text("Versão \(versionString)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            // Only shown once the opt-in weekly check (GH issue #46) has
+            // found a newer release — installing it is still manual.
+            if let update = updateStore.availableUpdate {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Atualização")
+                        .font(.headline)
+                    Text("Nova versão disponível: \(update.version)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Ver no GitHub") {
+                        NSWorkspace.shared.open(update.pageURL)
+                    }
                 }
             }
 

@@ -75,6 +75,29 @@ Claude Code ──(hook event on stdin)──▶ owl-hook ──(unix socket)─
 
 ## Install
 
+### From a release
+
+Each [release](https://github.com/luanhssa/owl-notch/releases) has an
+`Owl-vX.Y.Z.zip` with `Owl.app` and `owl-hook` inside:
+
+```bash
+cd ~/Downloads && ditto -x -k Owl-vX.Y.Z.zip .
+# Upgrading? Quit the running Owl and remove the old copy first — `mv`
+# onto an existing Owl.app would nest the new one inside it.
+pkill -x Owl; rm -rf /Applications/Owl.app
+mv dist/Owl.app /Applications/Owl.app
+mkdir -p ~/.claude/owl && mv -f dist/owl-hook ~/.claude/owl/owl-hook
+# Owl isn't signed with an Apple Developer ID, so a browser download is
+# quarantined by Gatekeeper; this clears that flag for Owl only.
+xattr -dr com.apple.quarantine /Applications/Owl.app ~/.claude/owl/owl-hook
+open /Applications/Owl.app
+```
+
+### From source
+
+Needs the Xcode command line tools (`xcode-select --install`; the full
+Xcode app isn't required):
+
 ```bash
 git clone git@github.com:luanhssa/owl-notch.git
 cd owl-notch
