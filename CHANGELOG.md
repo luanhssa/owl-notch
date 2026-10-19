@@ -17,6 +17,8 @@ semver's own rule for pre-1.0 releases.
   matched `/usage` and mostly cost notch height; while off, the row is
   hidden, the panel is that much shorter, and no transcript scan runs.
   The budget/reset settings only show once the bars are turned on.
+- The Preferences window scrolls instead of growing past the screen, so
+  every section stays reachable on a laptop display.
 
 ### Fixed
 
