@@ -10,6 +10,13 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Once the panel is expanded, the header's collapse target is limited to
+  the physical notch again, so clicks near the info/moon/xmark buttons no
+  longer collapse the panel by accident
+  ([#54](https://github.com/luanhssa/owl-notch/issues/54)).
+
 ## [0.20.0] - 2026-10-19
 
 ### Added
