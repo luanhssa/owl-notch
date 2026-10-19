@@ -10,6 +10,16 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+### Added
+
+- An opt-in (off by default) context-window line in each session's
+  expanded row — "contexto: 45% · 90k de 200k", read from the last
+  assistant turn in the session's transcript
+  ([#42](https://github.com/luanhssa/owl-notch/issues/42), partial — cost
+  is still open). Transcripts don't say which window a session runs
+  with, so a "Janela de contexto" setting picks it: 200k, 1M, or
+  "Automático" (200k until a session is already past it).
+
 ## [0.19.0] - 2026-10-19
 
 ### Added

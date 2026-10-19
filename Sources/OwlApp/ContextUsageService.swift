@@ -31,11 +31,14 @@ enum ContextUsageService {
 
     /// The standard Claude context window. Transcripts don't record which
     /// window a session runs with (the `[1m]` model suffix isn't written
-    /// to `message.model`), so this is inferred, not read — see `limit(for:)`.
+    /// to `message.model`), so this is inferred unless the user picked one
+    /// — see `limit(for:)` and `Preferences.contextWindowLimit`.
     static let standardContextLimit = 200_000
     static let extendedContextLimit = 1_000_000
 
-    static func usage(transcriptPath: String?) -> Usage? {
+    /// `windowLimit` is the user's own pick from Preferences; `nil` means
+    /// "Automático" and falls back to `limit(for:)`.
+    static func usage(transcriptPath: String?, windowLimit: Int? = nil) -> Usage? {
         guard let transcriptPath else { return nil }
         guard let handle = FileHandle(forReadingAtPath: transcriptPath) else { return nil }
         defer { handle.closeFile() }
@@ -67,17 +70,23 @@ enum ContextUsageService {
 
             let tokens = contextTokens(fromUsage: usage)
             guard tokens > 0 else { continue }
-            return Usage(tokens: tokens, limit: limit(for: tokens))
+            return Usage(tokens: tokens, limit: windowLimit ?? limit(for: tokens))
         }
         return nil
     }
 
     /// Assumes the standard 200k window unless the session is already past
     /// it, which can only happen on the 1M extended window. A 1M session
-    /// still under 200k therefore reads as fuller than it is — the safer
-    /// direction to be wrong in, and transcripts carry nothing better.
+    /// still under 200k therefore reads as fuller than it is, which is why
+    /// Preferences lets the user pin the window instead.
     static func limit(for tokens: Int) -> Int {
         tokens > standardContextLimit ? extendedContextLimit : standardContextLimit
+    }
+
+    /// "200k", "1M" — for window sizes in the notch and in Preferences,
+    /// where "1000k" would read oddly.
+    static func windowLabel(_ limit: Int) -> String {
+        limit % 1_000_000 == 0 ? "\(limit / 1_000_000)M" : "\(limit / 1_000)k"
     }
 
     private static func contextTokens(fromUsage usage: [String: Any]) -> Int {

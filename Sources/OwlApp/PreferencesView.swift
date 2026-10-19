@@ -44,6 +44,7 @@ struct PreferencesView: View {
     @State private var preferredDisplayID: CGDirectDisplayID?
     @State private var showLastMessageContent: Bool
     @State private var showContextUsage: Bool
+    @State private var contextWindowLimit: Int?
     @State private var checkForUpdates: Bool
     /// Held in millions rather than raw tokens: the range spans hundreds of
     /// millions, so a raw-token `Slider` would step in amounts too small to
@@ -71,6 +72,7 @@ struct PreferencesView: View {
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
         _showContextUsage = State(initialValue: Preferences.showContextUsage())
+        _contextWindowLimit = State(initialValue: Preferences.contextWindowLimit())
         _checkForUpdates = State(initialValue: Preferences.checkForUpdates())
         _tokenWindowBudgetMillions = State(initialValue: Double(Preferences.tokenWindowBudget()) / 1_000_000)
         _weeklyTokenBudgetMillions = State(initialValue: Double(Preferences.weeklyTokenBudget()) / 1_000_000)
@@ -82,6 +84,10 @@ struct PreferencesView: View {
     /// `weekdaySymbols` is already localized/capitalized for the current
     /// locale (unlike `standaloneWeekdaySymbols`, which some locales — incl.
     /// pt-BR — render lowercase, as they would mid-sentence).
+    private func contextWindowLabel(_ limit: Int) -> String {
+        ContextUsageService.windowLabel(limit)
+    }
+
     private func weekdayLabel(_ weekday: Int) -> String {
         Calendar.current.weekdaySymbols[weekday - 1]
     }
@@ -174,7 +180,18 @@ struct PreferencesView: View {
                     .onChange(of: showContextUsage) { newValue in
                         Preferences.setShowContextUsage(newValue)
                     }
-                Text("Desligado por padrão: mostra, na sessão expandida, quanto da janela de contexto já foi usado. O tamanho da janela é estimado (200k, ou 1M quando a sessão já passou disso).")
+                if showContextUsage {
+                    Picker("Janela de contexto", selection: $contextWindowLimit) {
+                        Text("Automático").tag(Int?.none)
+                        ForEach(Preferences.contextWindowLimits, id: \.self) { limit in
+                            Text(contextWindowLabel(limit)).tag(Int?.some(limit))
+                        }
+                    }
+                    .onChange(of: contextWindowLimit) { newValue in
+                        Preferences.setContextWindowLimit(newValue)
+                    }
+                }
+                Text("Desligado por padrão: mostra, na sessão expandida, quanto da janela de contexto já foi usado. O transcript não diz o tamanho da janela: em \"Automático\" o Owl assume 200k até a sessão passar disso, então escolha 1M se suas sessões usam a janela estendida.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

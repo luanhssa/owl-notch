@@ -79,6 +79,24 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences.showContextUsage(defaults: defaults))
     }
 
+    func testContextWindowLimitDefaultsToAutomatic() {
+        XCTAssertNil(Preferences.contextWindowLimit(defaults: defaults))
+    }
+
+    func testContextWindowLimitRoundTripsAndClearsBackToAutomatic() {
+        Preferences.setContextWindowLimit(1_000_000, defaults: defaults)
+        XCTAssertEqual(Preferences.contextWindowLimit(defaults: defaults), 1_000_000)
+        Preferences.setContextWindowLimit(nil, defaults: defaults)
+        XCTAssertNil(Preferences.contextWindowLimit(defaults: defaults))
+    }
+
+    func testContextWindowLimitIgnoresUnofferedSizes() {
+        defaults.set(123, forKey: "owl.contextWindowLimit")
+        XCTAssertNil(Preferences.contextWindowLimit(defaults: defaults))
+        Preferences.setContextWindowLimit(500_000, defaults: defaults)
+        XCTAssertNil(Preferences.contextWindowLimit(defaults: defaults))
+    }
+
     func testCheckForUpdatesDefaultsToFalseWhenUnset() {
         XCTAssertFalse(Preferences.checkForUpdates(defaults: defaults))
     }

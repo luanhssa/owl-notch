@@ -60,6 +60,20 @@ final class ContextUsageServiceTests: XCTestCase {
         XCTAssertEqual(ContextUsageService.limit(for: 250_000), ContextUsageService.extendedContextLimit)
     }
 
+    func testAPickedWindowOverridesTheInference() throws {
+        try writeTranscript([assistantLine(input: 150_000)])
+        XCTAssertEqual(
+            ContextUsageService.usage(transcriptPath: transcriptPath, windowLimit: 1_000_000),
+            .init(tokens: 150_000, limit: 1_000_000)
+        )
+        XCTAssertEqual(ContextUsageService.usage(transcriptPath: transcriptPath)?.limit, 200_000)
+    }
+
+    func testWindowLabels() {
+        XCTAssertEqual(ContextUsageService.windowLabel(200_000), "200k")
+        XCTAssertEqual(ContextUsageService.windowLabel(1_000_000), "1M")
+    }
+
     func testFractionIsClampedToOne() {
         XCTAssertEqual(ContextUsageService.Usage(tokens: 50_000, limit: 200_000).fraction, 0.25)
         XCTAssertEqual(ContextUsageService.Usage(tokens: 300_000, limit: 200_000).fraction, 1)

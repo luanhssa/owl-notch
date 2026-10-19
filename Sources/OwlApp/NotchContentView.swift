@@ -279,7 +279,7 @@ struct SessionRowView: View {
                     // Opt-in (GH issue #42) — see Preferences' "Mostrar o
                     // uso do contexto de cada sessão".
                     if let usage = session.contextUsage {
-                        Text("contexto: \(Int((usage.fraction * 100).rounded()))% · \(usage.tokens / 1_000)k de \(usage.limit / 1_000)k")
+                        Text("contexto: \(Int((usage.fraction * 100).rounded()))% · \(usage.tokens / 1_000)k de \(ContextUsageService.windowLabel(usage.limit))")
                             .font(.system(size: NotchStyle.captionFontSize))
                             .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                     }

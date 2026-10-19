@@ -627,8 +627,9 @@ final class SessionStore: ObservableObject {
     private func kickOffContextUsageLookupIfNeeded(sessionID: String, transcriptPath: String?) {
         guard !pendingContextUsageLookups.contains(sessionID) else { return }
         pendingContextUsageLookups.insert(sessionID)
+        let windowLimit = Preferences.contextWindowLimit(defaults: defaults)
         Task.detached { [weak self] in
-            let usage = ContextUsageService.usage(transcriptPath: transcriptPath)
+            let usage = ContextUsageService.usage(transcriptPath: transcriptPath, windowLimit: windowLimit)
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 pendingContextUsageLookups.remove(sessionID)
