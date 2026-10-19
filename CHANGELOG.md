@@ -29,6 +29,14 @@ semver's own rule for pre-1.0 releases.
 - The token-usage per-file cache drops entries for transcripts that were
   deleted or moved instead of keeping them for the life of the process
   ([#52](https://github.com/luanhssa/owl-notch/issues/52)).
+- Token-usage dedup for transcript lines missing `message.id` or
+  `requestId` now keys on whichever of the two is left, then on the
+  line's own `uuid`, before the old timestamp+model+tokens fallback.
+  Claude Code writes one response as several lines that share both ids
+  but not their `uuid`s, so this counts it once instead of once per
+  line, and two different turns can no longer be merged just for sharing
+  a timestamp, model and token total
+  ([#53](https://github.com/luanhssa/owl-notch/issues/53)).
 
 ## [0.19.0] - 2026-10-19
 
