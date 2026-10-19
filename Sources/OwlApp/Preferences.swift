@@ -13,6 +13,8 @@ enum Preferences {
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
+    private static let showContextUsageKey = "owl.showContextUsage"
+    private static let contextWindowLimitKey = "owl.contextWindowLimit"
     private static let checkForUpdatesKey = "owl.checkForUpdates"
     private static let lastUpdateCheckKey = "owl.lastUpdateCheck"
     private static let latestKnownReleaseVersionKey = "owl.latestKnownReleaseVersion"
@@ -93,6 +95,47 @@ enum Preferences {
 
     static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: showLastMessageContentKey)
+    }
+
+    /// Off by default (GH issue #42) — shows how full each session's
+    /// context window is in its expanded row. Costs one extra transcript
+    /// tail-read per hook event, and the window size is inferred rather
+    /// than read unless set (see `contextWindowLimit`), so it's opt-in
+    /// the same way the usage bars are.
+    static func showContextUsage(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showContextUsageKey) as? Bool ?? false
+    }
+
+    static func setShowContextUsage(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showContextUsageKey)
+    }
+
+    /// The context-window sizes the "Janela de contexto" picker offers.
+    static let contextWindowLimits = [
+        ContextUsageService.standardContextLimit,
+        ContextUsageService.extendedContextLimit,
+    ]
+
+    /// The context window the usage line measures against. Transcripts
+    /// don't record which window a session runs with, so this defaults to
+    /// `nil` — "Automático", meaning `ContextUsageService.limit(for:)`
+    /// infers it — and a user who knows their sessions run on the 1M
+    /// window can say so instead of seeing a 1M session under 200k read as
+    /// nearly full. Anything other than `contextWindowLimits` is unset.
+    static func contextWindowLimit(defaults: UserDefaults = .standard) -> Int? {
+        guard
+            let stored = defaults.object(forKey: contextWindowLimitKey) as? Int,
+            contextWindowLimits.contains(stored)
+        else { return nil }
+        return stored
+    }
+
+    static func setContextWindowLimit(_ limit: Int?, defaults: UserDefaults = .standard) {
+        if let limit, contextWindowLimits.contains(limit) {
+            defaults.set(limit, forKey: contextWindowLimitKey)
+        } else {
+            defaults.removeObject(forKey: contextWindowLimitKey)
+        }
     }
 
     /// Off by default (GH issue #46) — the weekly check is Owl's only
