@@ -13,6 +13,10 @@ enum Preferences {
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
+    private static let checkForUpdatesKey = "owl.checkForUpdates"
+    private static let lastUpdateCheckKey = "owl.lastUpdateCheck"
+    private static let latestKnownReleaseVersionKey = "owl.latestKnownReleaseVersion"
+    private static let latestKnownReleaseURLKey = "owl.latestKnownReleaseURL"
     private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
     private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
     private static let weeklyResetWeekdayKey = "owl.weeklyResetWeekday"
@@ -89,6 +93,44 @@ enum Preferences {
 
     static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: showLastMessageContentKey)
+    }
+
+    /// Off by default (GH issue #46) — the weekly check is Owl's only
+    /// network request, so it's opt-in rather than something a fresh
+    /// install starts doing on its own.
+    static func checkForUpdates(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: checkForUpdatesKey) as? Bool ?? false
+    }
+
+    static func setCheckForUpdates(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: checkForUpdatesKey)
+    }
+
+    /// When the last *successful* update check ran — not user-facing,
+    /// just what `UpdateCheckService.isCheckDue` measures from.
+    static func lastUpdateCheck(defaults: UserDefaults = .standard) -> Date? {
+        defaults.object(forKey: lastUpdateCheckKey) as? Date
+    }
+
+    static func setLastUpdateCheck(_ date: Date, defaults: UserDefaults = .standard) {
+        defaults.set(date, forKey: lastUpdateCheckKey)
+    }
+
+    /// The release the last successful update check found. Kept so the
+    /// About panel's notice survives a relaunch (or the check being turned
+    /// off and on) during the week no new check is due.
+    static func latestKnownRelease(defaults: UserDefaults = .standard) -> UpdateCheckService.Release? {
+        guard
+            let version = defaults.string(forKey: latestKnownReleaseVersionKey),
+            let page = defaults.string(forKey: latestKnownReleaseURLKey),
+            let pageURL = URL(string: page)
+        else { return nil }
+        return UpdateCheckService.Release(version: version, pageURL: pageURL)
+    }
+
+    static func setLatestKnownRelease(_ release: UpdateCheckService.Release, defaults: UserDefaults = .standard) {
+        defaults.set(release.version, forKey: latestKnownReleaseVersionKey)
+        defaults.set(release.pageURL.absoluteString, forKey: latestKnownReleaseURLKey)
     }
 
     /// The ceiling the notch's usage bar fills against. Claude Code doesn't
