@@ -254,29 +254,49 @@ enum TokenUsageService {
     /// `message.id` + `requestId` together identify one real API response
     /// — mirrors the dedup key other local Claude Code usage tools (e.g.
     /// ccusage) use for the same reason. When either is missing (an
-    /// older/newer transcript format, a malformed line), falls back in two
-    /// steps rather than skipping dedup entirely for exactly the atypical
+    /// older/newer transcript format, a malformed line), falls back step by
+    /// step rather than skipping dedup entirely for exactly the atypical
     /// lines where duplication is most likely (found during #49's review):
     ///
-    /// 1. The line's own `uuid` — every transcript line Claude Code writes
-    ///    carries one, and a resumed/compacted session that copies a line
-    ///    into a new file keeps it. Unlike the composite below, two
-    ///    *different* turns never share it, so it can't merge them (GH
-    ///    issue #53). Assumed from the transcript format, not documented
-    ///    by Claude Code — hence still a fallback, not the primary key.
-    /// 2. A (timestamp, model, tokens) composite, only for a line with no
-    ///    `uuid` either — narrower than the real key, and two distinct
-    ///    turns landing on the same second/model/total would collide, but
-    ///    it still catches an exact repeat.
+    /// 1. Whichever of `message.id` / `requestId` is still there. Claude
+    ///    Code writes one API response as several lines — one per content
+    ///    block, each with its own `uuid` but repeating the response's full
+    ///    `usage` — and every one of them shares both ids. So either id
+    ///    alone still collapses them; nothing below does (measured on real
+    ///    transcripts: keying by `uuid` or by the composite instead roughly
+    ///    doubled the total, GH issue #53).
+    /// 2. The line's own `uuid`. A resumed/compacted session that copies a
+    ///    line into a new file keeps it, and two *different* turns never
+    ///    share it, so unlike the composite it can't merge them — but it
+    ///    can't collapse a response's per-block lines either.
+    /// 3. A (timestamp, model, tokens) composite, only for a line with no
+    ///    `uuid` either — two distinct turns landing on the same
+    ///    second/model/total would collide, but it still catches an exact
+    ///    repeat.
+    ///
+    /// Each step is prefixed so keys from different steps never collide.
     private static func dedupKey(json: [String: Any], message: [String: Any], timestamp: Date, tokens: Int) -> String {
-        if let messageID = message["id"] as? String, let requestID = json["requestId"] as? String {
+        let messageID = nonEmptyString(message["id"])
+        let requestID = nonEmptyString(json["requestId"])
+        if let messageID, let requestID {
             return "\(messageID)|\(requestID)"
         }
-        if let uuid = json["uuid"] as? String, !uuid.isEmpty {
+        if let messageID {
+            return "message|\(messageID)"
+        }
+        if let requestID {
+            return "request|\(requestID)"
+        }
+        if let uuid = nonEmptyString(json["uuid"]) {
             return "uuid|\(uuid)"
         }
         let model = message["model"] as? String ?? ""
         return "fallback|\(timestamp.timeIntervalSince1970)|\(model)|\(tokens)"
+    }
+
+    private static func nonEmptyString(_ value: Any?) -> String? {
+        guard let string = value as? String, !string.isEmpty else { return nil }
+        return string
     }
 
     /// Dedup has to run across the *combined* set of turns from every

@@ -432,13 +432,22 @@ final class TokenUsageServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.windowTokens, 50, "an exact repeat with no id/requestId should still be deduplicated via the fallback key")
     }
 
-    private func lineMissingIDFields(uuid: String?, inputTokens: Int = 50) -> String {
+    private func lineMissingIDFields(
+        uuid: String?,
+        inputTokens: Int = 50,
+        messageID: String? = nil,
+        requestID: String? = nil,
+        timestamp: Date? = nil
+    ) -> String {
+        var message: [String: Any] = ["model": "claude-test", "usage": ["input_tokens": inputTokens, "output_tokens": 0]]
+        if let messageID { message["id"] = messageID }
         var json: [String: Any] = [
             "type": "assistant",
-            "timestamp": iso(referenceNow),
-            "message": ["model": "claude-test", "usage": ["input_tokens": inputTokens, "output_tokens": 0]],
+            "timestamp": iso(timestamp ?? referenceNow),
+            "message": message,
         ]
         if let uuid { json["uuid"] = uuid }
+        if let requestID { json["requestId"] = requestID }
         let data = try! JSONSerialization.data(withJSONObject: json)
         return String(data: data, encoding: .utf8)!
     }
@@ -468,6 +477,47 @@ final class TokenUsageServiceTests: XCTestCase {
         let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
 
         XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    /// Claude Code writes one API response as several lines (one per
+    /// content block), each with its own `uuid` and a slightly later
+    /// timestamp but the same `usage`. With only `message.id` left, those
+    /// must still count once — keying by `uuid` would count every block
+    /// (GH issue #53).
+    func testPerBlockLinesWithOnlyMessageIDCountOnce() throws {
+        let lines = (0..<3).map { block in
+            lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_1", timestamp: referenceNow.addingTimeInterval(Double(block)))
+        }
+        try writeTranscript(lines, to: "project-a/session-1.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow.addingTimeInterval(5))
+
+        XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    func testPerBlockLinesWithOnlyRequestIDCountOnce() throws {
+        let lines = (0..<3).map { block in
+            lineMissingIDFields(uuid: UUID().uuidString, requestID: "req_1", timestamp: referenceNow.addingTimeInterval(Double(block)))
+        }
+        try writeTranscript(lines, to: "project-a/session-1.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow.addingTimeInterval(5))
+
+        XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    func testDifferentMessageIDsWithoutRequestIDAreBothCounted() throws {
+        try writeTranscript(
+            [
+                lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_1"),
+                lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_2"),
+            ],
+            to: "project-a/session-1.jsonl"
+        )
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 100)
     }
 
     /// A transcript deleted between scans must drop out of the per-file
