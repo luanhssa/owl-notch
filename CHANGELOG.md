@@ -16,6 +16,10 @@ semver's own rule for pre-1.0 releases.
   the physical notch again, so clicks near the info/moon/xmark buttons no
   longer collapse the panel by accident
   ([#54](https://github.com/luanhssa/owl-notch/issues/54)).
+- `swift test` no longer leaves a new `owl-test-*.plist` in
+  `~/Library/Preferences` on every run — test suites use one fixed
+  `UserDefaults` name per test class
+  ([#56](https://github.com/luanhssa/owl-notch/issues/56)).
 
 ## [0.20.0] - 2026-10-19
 
@@ -73,10 +77,6 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
-- `swift test` no longer leaves a new `owl-test-*.plist` in
-  `~/Library/Preferences` on every run — test suites use one fixed
-  `UserDefaults` name per test class
-  ([#56](https://github.com/luanhssa/owl-notch/issues/56)).
 
 ## [0.18.0] - 2026-08-18
 
