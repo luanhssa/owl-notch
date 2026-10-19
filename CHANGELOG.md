@@ -10,6 +10,8 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-19
+
 ### Changed
 
 - The token-usage bars are now opt-in ("Mostrar barras de uso no notch"
