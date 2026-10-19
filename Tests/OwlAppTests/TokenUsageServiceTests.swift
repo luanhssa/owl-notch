@@ -431,4 +431,158 @@ final class TokenUsageServiceTests: XCTestCase {
 
         XCTAssertEqual(snapshot.windowTokens, 50, "an exact repeat with no id/requestId should still be deduplicated via the fallback key")
     }
+
+    private func lineMissingIDFields(
+        uuid: String?,
+        inputTokens: Int = 50,
+        messageID: String? = nil,
+        requestID: String? = nil,
+        timestamp: Date? = nil
+    ) -> String {
+        var message: [String: Any] = ["model": "claude-test", "usage": ["input_tokens": inputTokens, "output_tokens": 0]]
+        if let messageID { message["id"] = messageID }
+        var json: [String: Any] = [
+            "type": "assistant",
+            "timestamp": iso(timestamp ?? referenceNow),
+            "message": message,
+        ]
+        if let uuid { json["uuid"] = uuid }
+        if let requestID { json["requestId"] = requestID }
+        let data = try! JSONSerialization.data(withJSONObject: json)
+        return String(data: data, encoding: .utf8)!
+    }
+
+    /// Two genuinely different turns with no `message.id`/`requestId` that
+    /// happen to share timestamp, model and token total must both count
+    /// when their line `uuid`s differ (GH issue #53) — the composite
+    /// fallback alone would merge them.
+    func testDistinctTurnsMissingIDFieldsWithDifferentUUIDsAreBothCounted() throws {
+        try writeTranscript(
+            [lineMissingIDFields(uuid: UUID().uuidString), lineMissingIDFields(uuid: UUID().uuidString)],
+            to: "project-a/session-1.jsonl"
+        )
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 100)
+    }
+
+    /// The same line copied into a resumed session's file keeps its
+    /// `uuid`, so it's still deduplicated via that fallback.
+    func testRepeatedLineMissingIDFieldsIsDedupedByUUID() throws {
+        let line = lineMissingIDFields(uuid: UUID().uuidString)
+        try writeTranscript([line], to: "project-a/session-1.jsonl")
+        try writeTranscript([line], to: "project-a/session-1-resumed.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    /// Claude Code writes one API response as several lines (one per
+    /// content block), each with its own `uuid` and a slightly later
+    /// timestamp but the same `usage`. With only `message.id` left, those
+    /// must still count once — keying by `uuid` would count every block
+    /// (GH issue #53).
+    func testPerBlockLinesWithOnlyMessageIDCountOnce() throws {
+        let lines = (0..<3).map { block in
+            lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_1", timestamp: referenceNow.addingTimeInterval(Double(block)))
+        }
+        try writeTranscript(lines, to: "project-a/session-1.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow.addingTimeInterval(5))
+
+        XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    func testPerBlockLinesWithOnlyRequestIDCountOnce() throws {
+        let lines = (0..<3).map { block in
+            lineMissingIDFields(uuid: UUID().uuidString, requestID: "req_1", timestamp: referenceNow.addingTimeInterval(Double(block)))
+        }
+        try writeTranscript(lines, to: "project-a/session-1.jsonl")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow.addingTimeInterval(5))
+
+        XCTAssertEqual(snapshot.windowTokens, 50)
+    }
+
+    func testDifferentMessageIDsWithoutRequestIDAreBothCounted() throws {
+        try writeTranscript(
+            [
+                lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_1"),
+                lineMissingIDFields(uuid: UUID().uuidString, messageID: "msg_2"),
+            ],
+            to: "project-a/session-1.jsonl"
+        )
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 100)
+    }
+
+    /// A transcript deleted between scans must drop out of the per-file
+    /// cache instead of staying in memory for the life of the process
+    /// (GH issue #52). Matched by file name rather than full path, since
+    /// the enumerator may report the temp root under /private/var.
+    func testScanEvictsCacheEntriesForDeletedTranscripts() throws {
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project-a/session-1.jsonl")
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project-a/session-2.jsonl")
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+        let rootName = root.lastPathComponent
+        func cachedSessions() -> [String] {
+            TokenUsageService.cachedPaths()
+                .filter { $0.contains(rootName) }
+                .map { URL(fileURLWithPath: $0).lastPathComponent }
+                .sorted()
+        }
+        XCTAssertEqual(cachedSessions(), ["session-1.jsonl", "session-2.jsonl"])
+
+        try FileManager.default.removeItem(at: root.appendingPathComponent("project-a/session-2.jsonl"))
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(cachedSessions(), ["session-1.jsonl"])
+    }
+
+    /// A transcript bigger than one read chunk (1MB) is read in pieces,
+    /// so lines straddling a chunk boundary must still be stitched back
+    /// together and counted exactly once (GH issue #51).
+    func testCountsEveryTurnInAFileLargerThanOneReadChunk() throws {
+        let padding = String(repeating: "x", count: 600)
+        let lineCount = 3_000
+        let lines = (0..<lineCount).map { _ -> String in
+            let json: [String: Any] = [
+                "type": "assistant",
+                "timestamp": iso(referenceNow),
+                "requestId": UUID().uuidString,
+                "padding": padding,
+                "message": ["id": UUID().uuidString, "usage": ["input_tokens": 1, "output_tokens": 0]],
+            ]
+            let data = try! JSONSerialization.data(withJSONObject: json)
+            return String(data: data, encoding: .utf8)!
+        }
+        try writeTranscript(lines, to: "project-a/big-session.jsonl")
+        let size = try root.appendingPathComponent("project-a/big-session.jsonl").resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        XCTAssertGreaterThan(size, 1024 * 1024, "the fixture must actually span more than one chunk")
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, lineCount)
+    }
+
+    /// The last line of a file still counts when it has no trailing
+    /// newline — the chunked reader only splits on newlines, so the tail
+    /// is handled separately.
+    func testCountsALastLineWithoutATrailingNewline() throws {
+        let url = root.appendingPathComponent("project-a/session-1.jsonl")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let content = [
+            assistantLine(timestamp: iso(referenceNow), inputTokens: 10, outputTokens: 0),
+            assistantLine(timestamp: iso(referenceNow), inputTokens: 20, outputTokens: 0),
+        ].joined(separator: "\n")
+        try content.write(to: url, atomically: true, encoding: .utf8)
+
+        let snapshot = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(snapshot.windowTokens, 30)
+    }
 }
