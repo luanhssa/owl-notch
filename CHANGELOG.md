@@ -23,6 +23,10 @@ semver's own rule for pre-1.0 releases.
   CHANGELOG section as notes, so Owl can be installed without building
   from source ([#46](https://github.com/luanhssa/owl-notch/issues/46),
   phase 1).
+- An opt-in (off by default) weekly check for a newer GitHub release,
+  in Preferences > Geral. When one exists, the About panel says so and
+  links to it — installing is still manual
+  ([#46](https://github.com/luanhssa/owl-notch/issues/46), phase 1).
 
 ### Fixed
 
