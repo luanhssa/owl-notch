@@ -432,6 +432,29 @@ final class TokenUsageServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.windowTokens, 50, "an exact repeat with no id/requestId should still be deduplicated via the fallback key")
     }
 
+    /// A transcript deleted between scans must drop out of the per-file
+    /// cache instead of staying in memory for the life of the process
+    /// (GH issue #52). Matched by file name rather than full path, since
+    /// the enumerator may report the temp root under /private/var.
+    func testScanEvictsCacheEntriesForDeletedTranscripts() throws {
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project-a/session-1.jsonl")
+        try writeTranscript([assistantLine(timestamp: iso(referenceNow))], to: "project-a/session-2.jsonl")
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+        let rootName = root.lastPathComponent
+        func cachedSessions() -> [String] {
+            TokenUsageService.cachedPaths()
+                .filter { $0.contains(rootName) }
+                .map { URL(fileURLWithPath: $0).lastPathComponent }
+                .sorted()
+        }
+        XCTAssertEqual(cachedSessions(), ["session-1.jsonl", "session-2.jsonl"])
+
+        try FileManager.default.removeItem(at: root.appendingPathComponent("project-a/session-2.jsonl"))
+        _ = TokenUsageService.scan(projectsRoot: root, now: referenceNow)
+
+        XCTAssertEqual(cachedSessions(), ["session-1.jsonl"])
+    }
+
     /// A transcript bigger than one read chunk (1MB) is read in pieces,
     /// so lines straddling a chunk boundary must still be stitched back
     /// together and counted exactly once (GH issue #51).
