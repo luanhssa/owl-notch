@@ -13,6 +13,7 @@ enum Preferences {
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
+    private static let showTokenUsageKey = "owl.showTokenUsage"
     private static let showContextUsageKey = "owl.showContextUsage"
     private static let contextWindowLimitKey = "owl.contextWindowLimit"
     private static let checkForUpdatesKey = "owl.checkForUpdates"
@@ -95,6 +96,20 @@ enum Preferences {
 
     static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: showLastMessageContentKey)
+    }
+
+    /// Off by default — the usage bars fill against budgets Owl has to
+    /// guess (see `tokenWindowBudget`), so out of the box they rarely
+    /// match what Claude Code's own `/usage` shows, while still costing a
+    /// permanent row of notch height and a transcript scan every 30s. In
+    /// daily use they ended up ignored and mostly in the way; anyone who
+    /// wants them (and sets real budgets) turns them on in Preferences.
+    static func showTokenUsage(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showTokenUsageKey) as? Bool ?? false
+    }
+
+    static func setShowTokenUsage(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showTokenUsageKey)
     }
 
     /// Off by default (GH issue #42) — shows how full each session's

@@ -53,6 +53,7 @@ final class TokenUsageStoreTests: XCTestCase {
     }
 
     func testInitialScanResolvesAsynchronously() async throws {
+        Preferences.setShowTokenUsage(true, defaults: defaults)
         try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
         let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
 
@@ -60,6 +61,28 @@ final class TokenUsageStoreTests: XCTestCase {
         while store.snapshot.windowTokens == 0, Date() < deadline {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
+        XCTAssertEqual(store.snapshot.windowTokens, 42)
+    }
+
+    func testDoesNotScanWhileUsageIsDisabled() async throws {
+        try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
+        let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
+
+        XCTAssertFalse(store.isEnabled)
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(store.snapshot, .zero)
+    }
+
+    func testEnablingUsageInTheInjectedDefaultsStartsScanning() async throws {
+        try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
+        let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
+        Preferences.setShowTokenUsage(true, defaults: defaults)
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.snapshot.windowTokens == 0, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(store.isEnabled)
         XCTAssertEqual(store.snapshot.windowTokens, 42)
     }
 

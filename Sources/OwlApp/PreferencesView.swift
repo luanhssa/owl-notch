@@ -43,6 +43,7 @@ struct PreferencesView: View {
     @State private var loginItemEnabled: Bool
     @State private var preferredDisplayID: CGDirectDisplayID?
     @State private var showLastMessageContent: Bool
+    @State private var showTokenUsage: Bool
     @State private var showContextUsage: Bool
     @State private var contextWindowLimit: Int?
     @State private var checkForUpdates: Bool
@@ -71,6 +72,7 @@ struct PreferencesView: View {
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
+        _showTokenUsage = State(initialValue: Preferences.showTokenUsage())
         _showContextUsage = State(initialValue: Preferences.showContextUsage())
         _contextWindowLimit = State(initialValue: Preferences.contextWindowLimit())
         _checkForUpdates = State(initialValue: Preferences.checkForUpdates())
@@ -202,51 +204,61 @@ struct PreferencesView: View {
                 Text("Uso de tokens")
                     .font(.headline)
 
-                LabeledSliderRow(
-                    title: "Limite da janela de 5h",
-                    value: $tokenWindowBudgetMillions,
-                    range: budgetRangeInMillions,
-                    step: 5,
-                    suffix: "M",
-                    onCommit: { Preferences.setTokenWindowBudget(Int($0) * 1_000_000) }
-                )
-                LabeledSliderRow(
-                    title: "Limite semanal",
-                    value: $weeklyTokenBudgetMillions,
-                    range: weeklyBudgetRangeInMillions,
-                    step: 25,
-                    suffix: "M",
-                    onCommit: { Preferences.setWeeklyTokenBudget(Int($0) * 1_000_000) }
-                )
-
-                Text("O Claude Code não expõe os limites do seu plano, então as barras no notch enchem em relação a estes valores.")
+                Toggle("Mostrar barras de uso no notch", isOn: $showTokenUsage)
+                    .onChange(of: showTokenUsage) { newValue in
+                        Preferences.setShowTokenUsage(newValue)
+                    }
+                Text("Desligado por padrão: as barras são uma estimativa a partir dos transcripts e só fazem sentido com os limites abaixo ajustados ao seu plano.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Picker("Reinício semanal", selection: $weeklyResetWeekday) {
-                    Text("Automático (semana do calendário)").tag(Int?.none)
-                    ForEach(1...7, id: \.self) { weekday in
-                        Text(weekdayLabel(weekday)).tag(Int?.some(weekday))
-                    }
-                }
-                .onChange(of: weeklyResetWeekday) { newValue in
-                    Preferences.setWeeklyResetWeekday(newValue)
-                }
+                if showTokenUsage {
+                    LabeledSliderRow(
+                        title: "Limite da janela de 5h",
+                        value: $tokenWindowBudgetMillions,
+                        range: budgetRangeInMillions,
+                        step: 5,
+                        suffix: "M",
+                        onCommit: { Preferences.setTokenWindowBudget(Int($0) * 1_000_000) }
+                    )
+                    LabeledSliderRow(
+                        title: "Limite semanal",
+                        value: $weeklyTokenBudgetMillions,
+                        range: weeklyBudgetRangeInMillions,
+                        step: 25,
+                        suffix: "M",
+                        onCommit: { Preferences.setWeeklyTokenBudget(Int($0) * 1_000_000) }
+                    )
 
-                if weeklyResetWeekday != nil {
-                    Picker("Horário", selection: $weeklyResetHour) {
-                        ForEach(0..<24, id: \.self) { hour in
-                            Text(String(format: "%02d:00", hour)).tag(hour)
+                    Text("O Claude Code não expõe os limites do seu plano, então as barras no notch enchem em relação a estes valores.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Picker("Reinício semanal", selection: $weeklyResetWeekday) {
+                        Text("Automático (semana do calendário)").tag(Int?.none)
+                        ForEach(1...7, id: \.self) { weekday in
+                            Text(weekdayLabel(weekday)).tag(Int?.some(weekday))
                         }
                     }
-                    .onChange(of: weeklyResetHour) { newValue in
-                        Preferences.setWeeklyResetHour(newValue)
+                    .onChange(of: weeklyResetWeekday) { newValue in
+                        Preferences.setWeeklyResetWeekday(newValue)
                     }
-                }
 
-                Text("Owl não sabe o dia real em que o limite semanal da sua conta reinicia. Informe aqui o mesmo dia/horário mostrado em \"/usage\" no Claude Code para a barra semanal virar em sincronia com ele.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if weeklyResetWeekday != nil {
+                        Picker("Horário", selection: $weeklyResetHour) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text(String(format: "%02d:00", hour)).tag(hour)
+                            }
+                        }
+                        .onChange(of: weeklyResetHour) { newValue in
+                            Preferences.setWeeklyResetHour(newValue)
+                        }
+                    }
+
+                    Text("Owl não sabe o dia real em que o limite semanal da sua conta reinicia. Informe aqui o mesmo dia/horário mostrado em \"/usage\" no Claude Code para a barra semanal virar em sincronia com ele.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()

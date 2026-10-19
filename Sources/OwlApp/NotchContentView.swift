@@ -449,12 +449,17 @@ struct NotchContentView: View {
             if effectiveExpanded {
                 Divider().background(Color.white.opacity(NotchStyle.primaryDividerOpacity))
 
-                TokenUsageRowView(
-                    snapshot: tokenUsageStore.snapshot,
-                    windowBudget: tokenUsageStore.windowBudget,
-                    weeklyBudget: tokenUsageStore.weeklyBudget
-                )
-                Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
+                // Opt-in (`Preferences.showTokenUsage`, off by default) —
+                // `App.swift`'s `expandedContentHeight()` checks the same
+                // flag so the panel frame only reserves this row when shown.
+                if tokenUsageStore.isEnabled {
+                    TokenUsageRowView(
+                        snapshot: tokenUsageStore.snapshot,
+                        windowBudget: tokenUsageStore.windowBudget,
+                        weeklyBudget: tokenUsageStore.weeklyBudget
+                    )
+                    Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
+                }
 
                 // Captured once instead of accessed repeatedly below —
                 // `sortedSessions` re-sorts on every access (GH issue #18),

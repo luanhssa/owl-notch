@@ -72,6 +72,15 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences.showLastMessageContent(defaults: defaults))
     }
 
+    func testShowTokenUsageDefaultsToFalseWhenUnset() {
+        XCTAssertFalse(Preferences.showTokenUsage(defaults: defaults))
+    }
+
+    func testShowTokenUsageRoundTrips() {
+        Preferences.setShowTokenUsage(true, defaults: defaults)
+        XCTAssertTrue(Preferences.showTokenUsage(defaults: defaults))
+    }
+
     func testShowContextUsageDefaultsToFalseWhenUnset() {
         XCTAssertFalse(Preferences.showContextUsage(defaults: defaults))
     }
