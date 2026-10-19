@@ -10,6 +10,8 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-19
+
 ### Added
 
 - A "Reinício semanal" setting in Preferences: pick the weekday/hour
@@ -18,12 +20,15 @@ semver's own rule for pre-1.0 releases.
   calendar week. Left on "Automático" it behaves exactly as before —
   Owl still has no way to read your account's real reset schedule, so
   this only helps once you tell it what that schedule is.
-- An opt-in (off by default) context-window line in each session's
-  expanded row — "contexto: 45% · 90k de 200k", read from the last
-  assistant turn in the session's transcript
-  ([#42](https://github.com/luanhssa/owl-notch/issues/42), partial — cost
-  is still open). The window size is inferred: 200k, or 1M once a session
-  is already past 200k.
+- Releases: pushing a `vX.Y.Z` tag now builds `Owl.app` + `owl-hook` on
+  CI and publishes them as a GitHub Release zip, with that version's
+  CHANGELOG section as notes, so Owl can be installed without building
+  from source ([#46](https://github.com/luanhssa/owl-notch/issues/46),
+  phase 1).
+- An opt-in (off by default) weekly check for a newer GitHub release,
+  in Preferences > Geral. When one exists, the About panel says so and
+  links to it — installing is still manual
+  ([#46](https://github.com/luanhssa/owl-notch/issues/46), phase 1).
 
 ### Fixed
 

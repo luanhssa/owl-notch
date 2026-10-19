@@ -44,6 +44,7 @@ struct PreferencesView: View {
     @State private var preferredDisplayID: CGDirectDisplayID?
     @State private var showLastMessageContent: Bool
     @State private var showContextUsage: Bool
+    @State private var checkForUpdates: Bool
     /// Held in millions rather than raw tokens: the range spans hundreds of
     /// millions, so a raw-token `Slider` would step in amounts too small to
     /// ever reach the other end, and the label would be unreadable.
@@ -70,6 +71,7 @@ struct PreferencesView: View {
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
         _showContextUsage = State(initialValue: Preferences.showContextUsage())
+        _checkForUpdates = State(initialValue: Preferences.checkForUpdates())
         _tokenWindowBudgetMillions = State(initialValue: Double(Preferences.tokenWindowBudget()) / 1_000_000)
         _weeklyTokenBudgetMillions = State(initialValue: Double(Preferences.weeklyTokenBudget()) / 1_000_000)
         _weeklyResetWeekday = State(initialValue: Preferences.weeklyResetWeekday())
@@ -235,6 +237,14 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Geral")
                     .font(.headline)
+
+                Toggle("Verificar novas versões toda semana", isOn: $checkForUpdates)
+                    .onChange(of: checkForUpdates) { newValue in
+                        Preferences.setCheckForUpdates(newValue)
+                    }
+                Text("Desligado por padrão: consulta os releases do Owl no GitHub uma vez por semana e avisa no painel Sobre. Não instala nada sozinho.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 if LoginItemService.isAvailable {
                     Toggle("Abrir o Owl ao iniciar sessão", isOn: $loginItemEnabled)

@@ -79,6 +79,32 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences.showContextUsage(defaults: defaults))
     }
 
+    func testCheckForUpdatesDefaultsToFalseWhenUnset() {
+        XCTAssertFalse(Preferences.checkForUpdates(defaults: defaults))
+    }
+
+    func testCheckForUpdatesRoundTrips() {
+        Preferences.setCheckForUpdates(true, defaults: defaults)
+        XCTAssertTrue(Preferences.checkForUpdates(defaults: defaults))
+    }
+
+    func testLastUpdateCheckRoundTrips() {
+        XCTAssertNil(Preferences.lastUpdateCheck(defaults: defaults))
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        Preferences.setLastUpdateCheck(date, defaults: defaults)
+        XCTAssertEqual(Preferences.lastUpdateCheck(defaults: defaults), date)
+    }
+
+    func testLatestKnownReleaseRoundTrips() {
+        XCTAssertNil(Preferences.latestKnownRelease(defaults: defaults))
+        let release = UpdateCheckService.Release(
+            version: "0.19.0",
+            pageURL: URL(string: "https://github.com/luanhssa/owl-notch/releases/tag/v0.19.0")!
+        )
+        Preferences.setLatestKnownRelease(release, defaults: defaults)
+        XCTAssertEqual(Preferences.latestKnownRelease(defaults: defaults), release)
+    }
+
     func testTokenWindowBudgetDefaultsWhenUnset() {
         XCTAssertEqual(Preferences.tokenWindowBudget(defaults: defaults), Preferences.defaultTokenWindowBudget)
     }
