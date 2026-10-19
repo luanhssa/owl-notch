@@ -1,0 +1,75 @@
+# Publishes a GitHub Release when a version tag is pushed (GH issue #46,
+# phase 1). Tagging stays the same manual step it always was — bump
+# Resources/Info.plist on main, `git tag vX.Y.Z`, push the tag — this
+# only adds what happens after: build Owl.app + owl-hook on a Mac runner
+# and attach them as a zip, so a release can be installed without
+# building from source, and so Owl's own update check has something to
+# compare against.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # A tag that doesn't match the bundle's own version would publish a
+      # release Owl's update check could never reconcile with what it's
+      # running, so refuse it instead.
+      - name: Check tag matches Info.plist
+        run: |
+          plist_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)
+          if [ "v$plist_version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match Info.plist version $plist_version" >&2
+            exit 1
+          fi
+
+      - name: swift test
+        run: swift test
+
+      # Universal (arm64 + x86_64): the runner is Apple Silicon, so a
+      # plain build wouldn't run on Intel Macs.
+      - name: Build Owl.app (release, universal)
+        run: OWL_UNIVERSAL=1 ./Scripts/build-app-bundle.sh release
+
+      # `ditto` (not `zip`) so the bundle's symlinks, permissions and
+      # ad-hoc signature survive the round trip. `--norsrc` keeps
+      # extended attributes out of the zip: stored as `._*` files, a
+      # plain `unzip` drops them inside Owl.app and breaks its signature.
+      - name: Package
+        run: |
+          bin_dir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
+          mkdir -p dist
+          cp -R Owl.app dist/Owl.app
+          cp "$bin_dir/owl-hook" dist/owl-hook
+          ditto -c -k --norsrc --keepParent dist "Owl-$GITHUB_REF_NAME.zip"
+
+      # Release notes are this version's own CHANGELOG section, so the
+      # release page says the same thing the repo does.
+      - name: Extract release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "See CHANGELOG.md." > release-notes.md
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "Owl-$GITHUB_REF_NAME.zip" \
+            --title "Owl $GITHUB_REF_NAME" \
+            --notes-file release-notes.md
