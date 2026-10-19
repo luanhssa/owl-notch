@@ -35,17 +35,22 @@ jobs:
       - name: swift test
         run: swift test
 
-      - name: Build Owl.app (release)
-        run: ./Scripts/build-app-bundle.sh release
+      # Universal (arm64 + x86_64): the runner is Apple Silicon, so a
+      # plain build wouldn't run on Intel Macs.
+      - name: Build Owl.app (release, universal)
+        run: OWL_UNIVERSAL=1 ./Scripts/build-app-bundle.sh release
 
       # `ditto` (not `zip`) so the bundle's symlinks, permissions and
-      # ad-hoc signature survive the round trip.
+      # ad-hoc signature survive the round trip. `--norsrc` keeps
+      # extended attributes out of the zip: stored as `._*` files, a
+      # plain `unzip` drops them inside Owl.app and breaks its signature.
       - name: Package
         run: |
+          bin_dir=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
           mkdir -p dist
           cp -R Owl.app dist/Owl.app
-          cp .build/release/owl-hook dist/owl-hook
-          ditto -c -k --keepParent dist "Owl-$GITHUB_REF_NAME.zip"
+          cp "$bin_dir/owl-hook" dist/owl-hook
+          ditto -c -k --norsrc --keepParent dist "Owl-$GITHUB_REF_NAME.zip"
 
       # Release notes are this version's own CHANGELOG section, so the
       # release page says the same thing the repo does.

@@ -7,10 +7,23 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIG="${1:-debug}"
-swift build -c "$CONFIG"
+# OWL_UNIVERSAL=1 builds for both Apple Silicon and Intel — what a
+# published release needs, since the CI runner is arm64 and a plain
+# build would only run on Macs like it. Local installs skip it: it's
+# slower and only ever runs on the machine that built it.
+# (`${ARCH_FLAGS[@]+...}` because macOS bash 3.2 treats an empty array
+# as unset under `set -u`.)
+ARCH_FLAGS=()
+if [ "${OWL_UNIVERSAL:-0}" = "1" ]; then
+    ARCH_FLAGS=(--arch arm64 --arch x86_64)
+fi
+swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
+# Multi-arch builds land somewhere other than `.build/$CONFIG`, so ask
+# SwiftPM rather than hard-coding either path.
+BIN_DIR=$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)
 
 APP_DIR="Owl.app"
-BIN_SRC=".build/$CONFIG/OwlApp"
+BIN_SRC="$BIN_DIR/OwlApp"
 BIN_DST="$APP_DIR/Contents/MacOS/Owl"
 
 rm -rf "$APP_DIR"
