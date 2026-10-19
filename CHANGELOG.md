@@ -10,6 +10,8 @@ semver's own rule for pre-1.0 releases.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-19
+
 ### Added
 
 - An opt-in (off by default) context-window line in each session's
