@@ -84,6 +84,9 @@ enum TokenUsageService {
     /// one background scan if a future caller doesn't serialize them.
     private static let lock = NSLock()
     private static var cache: [String: CacheEntry] = [:]
+    /// Which `cache` keys each scanned root produced on its last scan —
+    /// what eviction diffs against (GH issue #52). Guarded by `lock`.
+    private static var pathsByRoot: [String: Set<String>] = [:]
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -116,6 +119,7 @@ enum TokenUsageService {
         ) else { return [] }
 
         var allTurns: [Turn] = []
+        var seenPaths: Set<String> = []
 
         for case let url as URL in enumerator {
             guard url.pathExtension == "jsonl" else { continue }
@@ -126,6 +130,7 @@ enum TokenUsageService {
             else { continue }
 
             let path = url.path
+            seenPaths.insert(path)
             lock.lock()
             let cached = cache[path]
             lock.unlock()
@@ -142,51 +147,156 @@ enum TokenUsageService {
             allTurns.append(contentsOf: turns)
         }
 
+        // Drop entries for transcripts under this root that weren't seen
+        // this scan (deleted or moved), so the cache tracks what's on disk
+        // rather than every file ever seen since launch (GH issue #52).
+        // Scoped per `projectsRoot` (via the paths that root produced last
+        // time) because the cache is shared across roots — tests scan
+        // their own temporary ones — and comparing enumerator paths
+        // against a root-path prefix would be fragile under symlinked
+        // locations like macOS's /var → /private/var.
+        lock.lock()
+        let previousPaths = pathsByRoot[projectsRoot.path] ?? []
+        for path in previousPaths.subtracting(seenPaths) {
+            cache[path] = nil
+        }
+        pathsByRoot[projectsRoot.path] = seenPaths
+        lock.unlock()
+
         return allTurns
     }
 
+    /// Test-only view into the per-file cache, so eviction (GH issue #52)
+    /// can be asserted without exposing the cache itself.
+    static func cachedPaths() -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return Set(cache.keys)
+    }
+
+    /// How much of a transcript is read per `FileHandle` call. Reading in
+    /// chunks keeps a scan's peak memory at about this size plus the
+    /// longest single line, instead of the whole file — a long session
+    /// with big embedded tool outputs can run to hundreds of MB (GH issue
+    /// #51). Unlike `SessionTitleService.maxBytesRead`, this isn't a cap:
+    /// every turn in the file has to be counted, so the whole file is
+    /// still read, just never all at once.
+    private static let readChunkSize = 1024 * 1024
+    private static let newline = UInt8(ascii: "\n")
+
     private static func parseTurns(fileURL: URL) -> [Turn] {
-        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return [] }
-        let text = String(decoding: data, as: UTF8.self)
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return [] }
+        defer { try? handle.close() }
 
         var turns: [Turn] = []
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            guard
-                let lineData = line.data(using: .utf8),
-                let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                json["type"] as? String == "assistant",
-                let message = json["message"] as? [String: Any],
-                let usage = message["usage"] as? [String: Any]
-            else { continue }
+        // Bytes of a line that started in an earlier chunk but hasn't hit
+        // its newline yet.
+        var pending = Data()
+        // How far into `pending` is already known to hold no newline, so a
+        // single line spanning many chunks isn't rescanned from its start
+        // on every chunk.
+        var searchFrom = 0
+        while true {
+            // Each chunk, and the JSON objects parsed from it, are
+            // autoreleased; without a pool per chunk they'd pile up until
+            // the whole file had been read, defeating the chunking.
+            let reachedEnd: Bool = autoreleasepool {
+                // `read(upToCount:)` throws on an I/O error, where
+                // `readData(ofLength:)` would raise an uncatchable exception.
+                guard let chunk = try? handle.read(upToCount: readChunkSize), !chunk.isEmpty else { return true }
+                pending.append(chunk)
 
-            let tokens = tokenCount(fromUsage: usage)
-            guard tokens > 0 else { continue }
-
-            guard
-                let timestampString = json["timestamp"] as? String,
-                let timestamp = isoFormatter.date(from: timestampString) ?? isoFormatterNoFraction.date(from: timestampString)
-            else { continue }
-
-            let key = dedupKey(json: json, message: message, timestamp: timestamp, tokens: tokens)
-            turns.append(Turn(dedupKey: key, timestamp: timestamp, tokens: tokens))
+                var lineStart = pending.startIndex
+                var searchStart = pending.startIndex + searchFrom
+                while let lineEnd = pending[searchStart...].firstIndex(of: newline) {
+                    if let turn = parseTurn(lineData: pending[lineStart..<lineEnd]) {
+                        turns.append(turn)
+                    }
+                    lineStart = pending.index(after: lineEnd)
+                    searchStart = lineStart
+                }
+                // Re-based copy so `pending`'s indices start at 0 again rather
+                // than growing with every chunk.
+                pending = Data(pending[lineStart...])
+                searchFrom = pending.count
+                return false
+            }
+            if reachedEnd { break }
+        }
+        // A last line with no trailing newline.
+        if let turn = parseTurn(lineData: pending) {
+            turns.append(turn)
         }
         return turns
+    }
+
+    private static func parseTurn(lineData: Data) -> Turn? {
+        guard
+            !lineData.isEmpty,
+            let json = try? JSONSerialization.jsonObject(with: Data(lineData)) as? [String: Any],
+            json["type"] as? String == "assistant",
+            let message = json["message"] as? [String: Any],
+            let usage = message["usage"] as? [String: Any]
+        else { return nil }
+
+        let tokens = tokenCount(fromUsage: usage)
+        guard tokens > 0 else { return nil }
+
+        guard
+            let timestampString = json["timestamp"] as? String,
+            let timestamp = isoFormatter.date(from: timestampString) ?? isoFormatterNoFraction.date(from: timestampString)
+        else { return nil }
+
+        let key = dedupKey(json: json, message: message, timestamp: timestamp, tokens: tokens)
+        return Turn(dedupKey: key, timestamp: timestamp, tokens: tokens)
     }
 
     /// `message.id` + `requestId` together identify one real API response
     /// — mirrors the dedup key other local Claude Code usage tools (e.g.
     /// ccusage) use for the same reason. When either is missing (an
-    /// older/newer transcript format, a malformed line), falls back to a
-    /// (timestamp, model, tokens) composite rather than skipping dedup
-    /// entirely for exactly the atypical lines where duplication is most
-    /// likely (found during #49's review) — narrower than the real key,
-    /// but still catches an exact repeat.
+    /// older/newer transcript format, a malformed line), falls back step by
+    /// step rather than skipping dedup entirely for exactly the atypical
+    /// lines where duplication is most likely (found during #49's review):
+    ///
+    /// 1. Whichever of `message.id` / `requestId` is still there. Claude
+    ///    Code writes one API response as several lines — one per content
+    ///    block, each with its own `uuid` but repeating the response's full
+    ///    `usage` — and every one of them shares both ids. So either id
+    ///    alone still collapses them; nothing below does (measured on real
+    ///    transcripts: keying by `uuid` or by the composite instead roughly
+    ///    doubled the total, GH issue #53).
+    /// 2. The line's own `uuid`. A resumed/compacted session that copies a
+    ///    line into a new file keeps it, and two *different* turns never
+    ///    share it, so unlike the composite it can't merge them — but it
+    ///    can't collapse a response's per-block lines either.
+    /// 3. A (timestamp, model, tokens) composite, only for a line with no
+    ///    `uuid` either — two distinct turns landing on the same
+    ///    second/model/total would collide, but it still catches an exact
+    ///    repeat.
+    ///
+    /// Each step is prefixed so keys from different steps never collide.
     private static func dedupKey(json: [String: Any], message: [String: Any], timestamp: Date, tokens: Int) -> String {
-        if let messageID = message["id"] as? String, let requestID = json["requestId"] as? String {
+        let messageID = nonEmptyString(message["id"])
+        let requestID = nonEmptyString(json["requestId"])
+        if let messageID, let requestID {
             return "\(messageID)|\(requestID)"
+        }
+        if let messageID {
+            return "message|\(messageID)"
+        }
+        if let requestID {
+            return "request|\(requestID)"
+        }
+        if let uuid = nonEmptyString(json["uuid"]) {
+            return "uuid|\(uuid)"
         }
         let model = message["model"] as? String ?? ""
         return "fallback|\(timestamp.timeIntervalSince1970)|\(model)|\(tokens)"
+    }
+
+    private static func nonEmptyString(_ value: Any?) -> String? {
+        guard let string = value as? String, !string.isEmpty else { return nil }
+        return string
     }
 
     /// Dedup has to run across the *combined* set of turns from every

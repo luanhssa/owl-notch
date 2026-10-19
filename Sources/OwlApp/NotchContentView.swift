@@ -276,6 +276,13 @@ struct SessionRowView: View {
                             .font(.system(size: NotchStyle.captionFontSize))
                             .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
                     }
+                    // Opt-in (GH issue #42) — see Preferences' "Mostrar o
+                    // uso do contexto de cada sessão".
+                    if let usage = session.contextUsage {
+                        Text("contexto: \(Int((usage.fraction * 100).rounded()))% · \(usage.tokens / 1_000)k de \(ContextUsageService.windowLabel(usage.limit))")
+                            .font(.system(size: NotchStyle.captionFontSize))
+                            .foregroundStyle(.white.opacity(NotchStyle.mutedTextOpacity))
+                    }
                     // Opt-in richer content (GH issue #45) takes priority
                     // over the terse tool-name summary when present — see
                     // Preferences' "Mostrar o conteúdo da última mensagem".
@@ -379,8 +386,11 @@ struct NotchContentView: View {
                         // the pill around it. Filling the header and
                         // stamping a rectangle over it makes the whole
                         // notch-sized area clickable, which is what it
-                        // looks like it should be.
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        // looks like it should be. Once expanded, the
+                        // width is capped back to the physical notch so the
+                        // "ears" around the info/moon/xmark buttons aren't
+                        // a collapse target too (GH issue #54).
+                        .frame(maxWidth: effectiveExpanded ? store.notchWidth : .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -439,12 +449,17 @@ struct NotchContentView: View {
             if effectiveExpanded {
                 Divider().background(Color.white.opacity(NotchStyle.primaryDividerOpacity))
 
-                TokenUsageRowView(
-                    snapshot: tokenUsageStore.snapshot,
-                    windowBudget: tokenUsageStore.windowBudget,
-                    weeklyBudget: tokenUsageStore.weeklyBudget
-                )
-                Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
+                // Opt-in (`Preferences.showTokenUsage`, off by default) —
+                // `App.swift`'s `expandedContentHeight()` checks the same
+                // flag so the panel frame only reserves this row when shown.
+                if tokenUsageStore.isEnabled {
+                    TokenUsageRowView(
+                        snapshot: tokenUsageStore.snapshot,
+                        windowBudget: tokenUsageStore.windowBudget,
+                        weeklyBudget: tokenUsageStore.weeklyBudget
+                    )
+                    Divider().background(Color.white.opacity(NotchStyle.secondaryDividerOpacity))
+                }
 
                 // Captured once instead of accessed repeatedly below —
                 // `sortedSessions` re-sorts on every access (GH issue #18),

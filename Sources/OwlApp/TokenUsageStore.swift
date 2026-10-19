@@ -15,6 +15,10 @@ final class TokenUsageStore: ObservableObject {
     /// immediately instead of at the next 30s tick.
     @Published private(set) var windowBudget: Int
     @Published private(set) var weeklyBudget: Int
+    /// Mirrors `Preferences.showTokenUsage` (off by default). While off,
+    /// the notch hides the usage row and no transcript scan runs at all —
+    /// the timer still ticks, but `refresh()` returns immediately.
+    @Published private(set) var isEnabled: Bool
 
     /// Scanning every transcript file on disk isn't free, and token totals
     /// don't need to be second-accurate — 30s keeps the notch's numbers
@@ -47,6 +51,7 @@ final class TokenUsageStore: ObservableObject {
         self.refreshInterval = refreshInterval
         windowBudget = Preferences.tokenWindowBudget(defaults: defaults)
         weeklyBudget = Preferences.weeklyTokenBudget(defaults: defaults)
+        isEnabled = Preferences.showTokenUsage(defaults: defaults)
 
         refresh()
         // Mirrors `SessionStore`'s own `NSWorkspace` observer: `[weak self]`
@@ -72,6 +77,10 @@ final class TokenUsageStore: ObservableObject {
                 guard let self else { return }
                 self.windowBudget = Preferences.tokenWindowBudget(defaults: self.defaults)
                 self.weeklyBudget = Preferences.weeklyTokenBudget(defaults: self.defaults)
+                let isEnabled = Preferences.showTokenUsage(defaults: self.defaults)
+                if self.isEnabled != isEnabled {
+                    self.isEnabled = isEnabled
+                }
                 // Budgets alone don't need a rescan — they're just the bar's
                 // denominator. The weekly reset day/hour changes the actual
                 // `weekTokens`/`weekEnd` computation, so it needs one to show
@@ -89,7 +98,7 @@ final class TokenUsageStore: ObservableObject {
     }
 
     private func refresh() {
-        guard !isScanning else { return }
+        guard isEnabled, !isScanning else { return }
         isScanning = true
         let root = projectsRoot
         let weekResetWeekday = Preferences.weeklyResetWeekday(defaults: defaults)

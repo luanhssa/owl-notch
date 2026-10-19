@@ -15,7 +15,9 @@ final class TokenUsageStoreTests: XCTestCase {
         // UserDefaults.
         root = FileManager.default.temporaryDirectory.appendingPathComponent("owl-token-store-test-\(UUID().uuidString)", isDirectory: true)
         try! FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        suiteName = "owl-test-\(UUID().uuidString)"
+        // Fixed name, cleared up front — see SessionStoreTests (GH issue #56).
+        suiteName = "owl-tests.TokenUsageStore"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         defaults = UserDefaults(suiteName: suiteName)
     }
 
@@ -51,6 +53,7 @@ final class TokenUsageStoreTests: XCTestCase {
     }
 
     func testInitialScanResolvesAsynchronously() async throws {
+        Preferences.setShowTokenUsage(true, defaults: defaults)
         try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
         let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
 
@@ -58,6 +61,28 @@ final class TokenUsageStoreTests: XCTestCase {
         while store.snapshot.windowTokens == 0, Date() < deadline {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
+        XCTAssertEqual(store.snapshot.windowTokens, 42)
+    }
+
+    func testDoesNotScanWhileUsageIsDisabled() async throws {
+        try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
+        let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
+
+        XCTAssertFalse(store.isEnabled)
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(store.snapshot, .zero)
+    }
+
+    func testEnablingUsageInTheInjectedDefaultsStartsScanning() async throws {
+        try writeTranscript(assistantLine(inputTokens: 42), to: "project-a/session-1.jsonl")
+        let store = TokenUsageStore(projectsRoot: root, defaults: defaults, refreshInterval: 3600)
+        Preferences.setShowTokenUsage(true, defaults: defaults)
+
+        let deadline = Date().addingTimeInterval(2)
+        while store.snapshot.windowTokens == 0, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(store.isEnabled)
         XCTAssertEqual(store.snapshot.windowTokens, 42)
     }
 
@@ -87,7 +112,7 @@ final class TokenUsageStoreTests: XCTestCase {
     /// (rather than `object: nil`) actually isolates instances, which
     /// matters for test hygiene as much as production correctness.
     func testDoesNotReactToADifferentInstancesDefaults() async throws {
-        let otherSuiteName = "owl-test-other-\(UUID().uuidString)"
+        let otherSuiteName = "owl-tests.TokenUsageStore.other"
         let otherDefaults = UserDefaults(suiteName: otherSuiteName)
         defer { otherDefaults!.removePersistentDomain(forName: otherSuiteName) }
 

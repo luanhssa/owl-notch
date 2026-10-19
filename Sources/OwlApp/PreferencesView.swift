@@ -43,6 +43,10 @@ struct PreferencesView: View {
     @State private var loginItemEnabled: Bool
     @State private var preferredDisplayID: CGDirectDisplayID?
     @State private var showLastMessageContent: Bool
+    @State private var showTokenUsage: Bool
+    @State private var showContextUsage: Bool
+    @State private var contextWindowLimit: Int?
+    @State private var checkForUpdates: Bool
     /// Held in millions rather than raw tokens: the range spans hundreds of
     /// millions, so a raw-token `Slider` would step in amounts too small to
     /// ever reach the other end, and the label would be unreadable.
@@ -75,6 +79,10 @@ struct PreferencesView: View {
         _loginItemEnabled = State(initialValue: LoginItemService.isEnabled)
         _preferredDisplayID = State(initialValue: Preferences.preferredDisplayID())
         _showLastMessageContent = State(initialValue: Preferences.showLastMessageContent())
+        _showTokenUsage = State(initialValue: Preferences.showTokenUsage())
+        _showContextUsage = State(initialValue: Preferences.showContextUsage())
+        _contextWindowLimit = State(initialValue: Preferences.contextWindowLimit())
+        _checkForUpdates = State(initialValue: Preferences.checkForUpdates())
         _tokenWindowBudgetMillions = State(initialValue: Double(Preferences.tokenWindowBudget()) / 1_000_000)
         _weeklyTokenBudgetMillions = State(initialValue: Double(Preferences.weeklyTokenBudget()) / 1_000_000)
         _weeklyResetWeekday = State(initialValue: Preferences.weeklyResetWeekday())
@@ -85,6 +93,10 @@ struct PreferencesView: View {
     /// `weekdaySymbols` is already localized/capitalized for the current
     /// locale (unlike `standaloneWeekdaySymbols`, which some locales — incl.
     /// pt-BR — render lowercase, as they would mid-sentence).
+    private func contextWindowLabel(_ limit: Int) -> String {
+        ContextUsageService.windowLabel(limit)
+    }
+
     private func weekdayLabel(_ weekday: Int) -> String {
         Calendar.current.weekdaySymbols[weekday - 1]
     }
@@ -177,6 +189,25 @@ struct PreferencesView: View {
                     Text("Desligado por padrão: mostra o texto real da última mensagem/resultado em vez de só o nome da ferramenta — conteúdo da conversa, possivelmente sensível, numa tela sempre visível.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Toggle("Mostrar o uso do contexto de cada sessão", isOn: $showContextUsage)
+                        .onChange(of: showContextUsage) { newValue in
+                            Preferences.setShowContextUsage(newValue)
+                        }
+                    if showContextUsage {
+                        Picker("Janela de contexto", selection: $contextWindowLimit) {
+                            Text("Automático").tag(Int?.none)
+                            ForEach(Preferences.contextWindowLimits, id: \.self) { limit in
+                                Text(contextWindowLabel(limit)).tag(Int?.some(limit))
+                            }
+                        }
+                        .onChange(of: contextWindowLimit) { newValue in
+                            Preferences.setContextWindowLimit(newValue)
+                        }
+                    }
+                    Text("Desligado por padrão: mostra, na sessão expandida, quanto da janela de contexto já foi usado. O transcript não diz o tamanho da janela: em \"Automático\" o Owl assume 200k até a sessão passar disso, então escolha 1M se suas sessões usam a janela estendida.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Divider()
@@ -185,51 +216,61 @@ struct PreferencesView: View {
                     Text("Uso de tokens")
                         .font(.headline)
 
-                    LabeledSliderRow(
-                        title: "Limite da janela de 5h",
-                        value: $tokenWindowBudgetMillions,
-                        range: budgetRangeInMillions,
-                        step: 5,
-                        suffix: "M",
-                        onCommit: { Preferences.setTokenWindowBudget(Int($0) * 1_000_000) }
-                    )
-                    LabeledSliderRow(
-                        title: "Limite semanal",
-                        value: $weeklyTokenBudgetMillions,
-                        range: weeklyBudgetRangeInMillions,
-                        step: 25,
-                        suffix: "M",
-                        onCommit: { Preferences.setWeeklyTokenBudget(Int($0) * 1_000_000) }
-                    )
-
-                    Text("O Claude Code não expõe os limites do seu plano, então as barras no notch enchem em relação a estes valores.")
+                    Toggle("Mostrar barras de uso no notch", isOn: $showTokenUsage)
+                        .onChange(of: showTokenUsage) { newValue in
+                            Preferences.setShowTokenUsage(newValue)
+                        }
+                    Text("Desligado por padrão: as barras são uma estimativa a partir dos transcripts e só fazem sentido com os limites abaixo ajustados ao seu plano.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Picker("Reinício semanal", selection: $weeklyResetWeekday) {
-                        Text("Automático (semana do calendário)").tag(Int?.none)
-                        ForEach(1...7, id: \.self) { weekday in
-                            Text(weekdayLabel(weekday)).tag(Int?.some(weekday))
-                        }
-                    }
-                    .onChange(of: weeklyResetWeekday) { newValue in
-                        Preferences.setWeeklyResetWeekday(newValue)
-                    }
+                    if showTokenUsage {
+                        LabeledSliderRow(
+                            title: "Limite da janela de 5h",
+                            value: $tokenWindowBudgetMillions,
+                            range: budgetRangeInMillions,
+                            step: 5,
+                            suffix: "M",
+                            onCommit: { Preferences.setTokenWindowBudget(Int($0) * 1_000_000) }
+                        )
+                        LabeledSliderRow(
+                            title: "Limite semanal",
+                            value: $weeklyTokenBudgetMillions,
+                            range: weeklyBudgetRangeInMillions,
+                            step: 25,
+                            suffix: "M",
+                            onCommit: { Preferences.setWeeklyTokenBudget(Int($0) * 1_000_000) }
+                        )
 
-                    if weeklyResetWeekday != nil {
-                        Picker("Horário", selection: $weeklyResetHour) {
-                            ForEach(0..<24, id: \.self) { hour in
-                                Text(String(format: "%02d:00", hour)).tag(hour)
+                        Text("O Claude Code não expõe os limites do seu plano, então as barras no notch enchem em relação a estes valores.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Picker("Reinício semanal", selection: $weeklyResetWeekday) {
+                            Text("Automático (semana do calendário)").tag(Int?.none)
+                            ForEach(1...7, id: \.self) { weekday in
+                                Text(weekdayLabel(weekday)).tag(Int?.some(weekday))
                             }
                         }
-                        .onChange(of: weeklyResetHour) { newValue in
-                            Preferences.setWeeklyResetHour(newValue)
+                        .onChange(of: weeklyResetWeekday) { newValue in
+                            Preferences.setWeeklyResetWeekday(newValue)
                         }
-                    }
 
-                    Text("Owl não sabe o dia real em que o limite semanal da sua conta reinicia. Informe aqui o mesmo dia/horário mostrado em \"/usage\" no Claude Code para a barra semanal virar em sincronia com ele.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        if weeklyResetWeekday != nil {
+                            Picker("Horário", selection: $weeklyResetHour) {
+                                ForEach(0..<24, id: \.self) { hour in
+                                    Text(String(format: "%02d:00", hour)).tag(hour)
+                                }
+                            }
+                            .onChange(of: weeklyResetHour) { newValue in
+                                Preferences.setWeeklyResetHour(newValue)
+                            }
+                        }
+
+                        Text("Owl não sabe o dia real em que o limite semanal da sua conta reinicia. Informe aqui o mesmo dia/horário mostrado em \"/usage\" no Claude Code para a barra semanal virar em sincronia com ele.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Divider()
@@ -237,6 +278,14 @@ struct PreferencesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Geral")
                         .font(.headline)
+
+                    Toggle("Verificar novas versões toda semana", isOn: $checkForUpdates)
+                        .onChange(of: checkForUpdates) { newValue in
+                            Preferences.setCheckForUpdates(newValue)
+                        }
+                    Text("Desligado por padrão: consulta os releases do Owl no GitHub uma vez por semana e avisa no painel Sobre. Não instala nada sozinho.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     if LoginItemService.isAvailable {
                         Toggle("Abrir o Owl ao iniciar sessão", isOn: $loginItemEnabled)

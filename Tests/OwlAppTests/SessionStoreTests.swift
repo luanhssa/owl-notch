@@ -11,7 +11,13 @@ final class SessionStoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("owl-test-\(UUID().uuidString).json")
-        defaultsSuiteName = "owl-test-\(UUID().uuidString)"
+        // One fixed suite name per test class, cleared up front, rather
+        // than a fresh UUID per test — `removePersistentDomain` empties a
+        // suite but `cfprefsd` still leaves its `.plist` behind in
+        // ~/Library/Preferences, so unique names piled up one file per
+        // test run (GH issue #56).
+        defaultsSuiteName = "owl-tests.SessionStore"
+        UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         store = SessionStore(persistenceURL: tempURL, defaults: defaults)
     }

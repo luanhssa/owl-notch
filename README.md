@@ -29,17 +29,19 @@ as urgent, an optional system notification for when a session needs
 attention while the notch itself isn't a reliable signal (locked screen,
 no notch display), which display the panel is pinned to on a multi-monitor
 setup, an opt-in (off by default) mode that shows the real last message
-instead of just a tool name, the token budgets for the usage bars (below),
-and the "open at login" toggle. The moon button next to it snoozes every
+instead of just a tool name, the opt-in usage bars and their token budgets
+(below), and the "open at login" toggle. The moon button next to it snoozes every
 session's urgent highlight for 30 minutes of focus time; each session also
 has its own snooze button, in its expanded row.
 
-The expanded panel also carries usage bars laid out like Claude Code's own
-`/usage` panel — one row per limit, with its name, when it resets and the
-percentage consumed. Owl shows two: the current 5-hour window and the
-calendar week. The numbers come from the transcripts under
-`~/.claude/projects`; Claude Code doesn't publish your plan's allowances,
-so the ceilings the bars fill against are ones you set in Preferences.
+Optionally (off by default, toggled in Preferences), the expanded panel
+also carries usage bars laid out like Claude Code's own `/usage` panel —
+one row per limit, with its name, when it resets and the percentage
+consumed. Owl shows two: the current 5-hour window and the calendar week.
+The numbers come from the transcripts under `~/.claude/projects`; Claude
+Code doesn't publish your plan's allowances, so the ceilings the bars fill
+against are ones you set in Preferences — treat them as an estimate, not
+a mirror of `/usage`.
 
 The About panel also has the app's only quit button — Owl has no Dock icon
 or menu bar item, so ⌘Q has nothing to hang off.
@@ -72,6 +74,29 @@ Claude Code ──(hook event on stdin)──▶ owl-hook ──(unix socket)─
 - [Claude Code](https://claude.com/product/claude-code)
 
 ## Install
+
+### From a release
+
+Each [release](https://github.com/luanhssa/owl-notch/releases) has an
+`Owl-vX.Y.Z.zip` with `Owl.app` and `owl-hook` inside:
+
+```bash
+cd ~/Downloads && ditto -x -k Owl-vX.Y.Z.zip .
+# Upgrading? Quit the running Owl and remove the old copy first — `mv`
+# onto an existing Owl.app would nest the new one inside it.
+pkill -x Owl; rm -rf /Applications/Owl.app
+mv dist/Owl.app /Applications/Owl.app
+mkdir -p ~/.claude/owl && mv -f dist/owl-hook ~/.claude/owl/owl-hook
+# Owl isn't signed with an Apple Developer ID, so a browser download is
+# quarantined by Gatekeeper; this clears that flag for Owl only.
+xattr -dr com.apple.quarantine /Applications/Owl.app ~/.claude/owl/owl-hook
+open /Applications/Owl.app
+```
+
+### From source
+
+Needs the Xcode command line tools (`xcode-select --install`; the full
+Xcode app isn't required):
 
 ```bash
 git clone git@github.com:luanhssa/owl-notch.git

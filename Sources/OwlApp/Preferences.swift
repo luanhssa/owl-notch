@@ -13,6 +13,13 @@ enum Preferences {
     private static let systemNotificationsEnabledKey = "owl.systemNotificationsEnabled"
     private static let preferredDisplayIDKey = "owl.preferredDisplayID"
     private static let showLastMessageContentKey = "owl.showLastMessageContent"
+    private static let showTokenUsageKey = "owl.showTokenUsage"
+    private static let showContextUsageKey = "owl.showContextUsage"
+    private static let contextWindowLimitKey = "owl.contextWindowLimit"
+    private static let checkForUpdatesKey = "owl.checkForUpdates"
+    private static let lastUpdateCheckKey = "owl.lastUpdateCheck"
+    private static let latestKnownReleaseVersionKey = "owl.latestKnownReleaseVersion"
+    private static let latestKnownReleaseURLKey = "owl.latestKnownReleaseURL"
     private static let tokenWindowBudgetKey = "owl.tokenWindowBudget"
     private static let weeklyTokenBudgetKey = "owl.weeklyTokenBudget"
     private static let weeklyResetWeekdayKey = "owl.weeklyResetWeekday"
@@ -89,6 +96,99 @@ enum Preferences {
 
     static func setShowLastMessageContent(_ value: Bool, defaults: UserDefaults = .standard) {
         defaults.set(value, forKey: showLastMessageContentKey)
+    }
+
+    /// Off by default — the usage bars fill against budgets Owl has to
+    /// guess (see `tokenWindowBudget`), so out of the box they rarely
+    /// match what Claude Code's own `/usage` shows, while still costing a
+    /// permanent row of notch height and a transcript scan every 30s. In
+    /// daily use they ended up ignored and mostly in the way; anyone who
+    /// wants them (and sets real budgets) turns them on in Preferences.
+    static func showTokenUsage(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showTokenUsageKey) as? Bool ?? false
+    }
+
+    static func setShowTokenUsage(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showTokenUsageKey)
+    }
+
+    /// Off by default (GH issue #42) — shows how full each session's
+    /// context window is in its expanded row. Costs one extra transcript
+    /// tail-read per hook event, and the window size is inferred rather
+    /// than read unless set (see `contextWindowLimit`), so it's opt-in
+    /// the same way the usage bars are.
+    static func showContextUsage(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: showContextUsageKey) as? Bool ?? false
+    }
+
+    static func setShowContextUsage(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: showContextUsageKey)
+    }
+
+    /// The context-window sizes the "Janela de contexto" picker offers.
+    static let contextWindowLimits = [
+        ContextUsageService.standardContextLimit,
+        ContextUsageService.extendedContextLimit,
+    ]
+
+    /// The context window the usage line measures against. Transcripts
+    /// don't record which window a session runs with, so this defaults to
+    /// `nil` — "Automático", meaning `ContextUsageService.limit(for:)`
+    /// infers it — and a user who knows their sessions run on the 1M
+    /// window can say so instead of seeing a 1M session under 200k read as
+    /// nearly full. Anything other than `contextWindowLimits` is unset.
+    static func contextWindowLimit(defaults: UserDefaults = .standard) -> Int? {
+        guard
+            let stored = defaults.object(forKey: contextWindowLimitKey) as? Int,
+            contextWindowLimits.contains(stored)
+        else { return nil }
+        return stored
+    }
+
+    static func setContextWindowLimit(_ limit: Int?, defaults: UserDefaults = .standard) {
+        if let limit, contextWindowLimits.contains(limit) {
+            defaults.set(limit, forKey: contextWindowLimitKey)
+        } else {
+            defaults.removeObject(forKey: contextWindowLimitKey)
+        }
+    }
+
+    /// Off by default (GH issue #46) — the weekly check is Owl's only
+    /// network request, so it's opt-in rather than something a fresh
+    /// install starts doing on its own.
+    static func checkForUpdates(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: checkForUpdatesKey) as? Bool ?? false
+    }
+
+    static func setCheckForUpdates(_ value: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: checkForUpdatesKey)
+    }
+
+    /// When the last *successful* update check ran — not user-facing,
+    /// just what `UpdateCheckService.isCheckDue` measures from.
+    static func lastUpdateCheck(defaults: UserDefaults = .standard) -> Date? {
+        defaults.object(forKey: lastUpdateCheckKey) as? Date
+    }
+
+    static func setLastUpdateCheck(_ date: Date, defaults: UserDefaults = .standard) {
+        defaults.set(date, forKey: lastUpdateCheckKey)
+    }
+
+    /// The release the last successful update check found. Kept so the
+    /// About panel's notice survives a relaunch (or the check being turned
+    /// off and on) during the week no new check is due.
+    static func latestKnownRelease(defaults: UserDefaults = .standard) -> UpdateCheckService.Release? {
+        guard
+            let version = defaults.string(forKey: latestKnownReleaseVersionKey),
+            let page = defaults.string(forKey: latestKnownReleaseURLKey),
+            let pageURL = URL(string: page)
+        else { return nil }
+        return UpdateCheckService.Release(version: version, pageURL: pageURL)
+    }
+
+    static func setLatestKnownRelease(_ release: UpdateCheckService.Release, defaults: UserDefaults = .standard) {
+        defaults.set(release.version, forKey: latestKnownReleaseVersionKey)
+        defaults.set(release.pageURL.absoluteString, forKey: latestKnownReleaseURLKey)
     }
 
     /// The ceiling the notch's usage bar fills against. Claude Code doesn't

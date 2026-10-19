@@ -8,6 +8,10 @@ enum NotchLayout {
     static let expandedListMaxHeight: CGFloat = 280
     static let collapsedRowHeight: CGFloat = 36
     static let accordionDetailExtraHeight: CGFloat = 74
+    /// The opt-in context-usage line (GH issue #42) in an expanded row —
+    /// one caption line plus the detail block's spacing, added on top of
+    /// `accordionDetailExtraHeight` only when that line is shown.
+    static let contextUsageLineHeight: CGFloat = 18
     /// Fixed height of the usage section shown right below the header
     /// whenever the notch is expanded — two limit rows (label + bar) plus
     /// the gap between them. Unlike the session list it never grows, so
