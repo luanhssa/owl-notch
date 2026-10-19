@@ -12,7 +12,9 @@ final class UpdateStoreTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "owl-test-\(UUID().uuidString)"
+        // Fixed name, cleared up front — see SessionStoreTests (GH issue #56).
+        suiteName = "owl-tests.UpdateStore"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         defaults = UserDefaults(suiteName: suiteName)
         // A check that just ran keeps every test here off the network.
         Preferences.setLastUpdateCheck(Date(), defaults: defaults)
