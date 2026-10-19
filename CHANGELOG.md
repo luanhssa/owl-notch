@@ -20,6 +20,13 @@ semver's own rule for pre-1.0 releases.
   with, so a "Janela de contexto" setting picks it: 200k, 1M, or
   "Automático" (200k until a session is already past it).
 
+### Fixed
+
+- Token usage reads each transcript in 1MB chunks instead of loading the
+  whole file into memory at once, so one huge session file no longer
+  spikes Owl's memory — about 34MB at peak for a 300MB transcript, down
+  from over 900MB ([#51](https://github.com/luanhssa/owl-notch/issues/51)).
+
 ## [0.19.0] - 2026-10-19
 
 ### Added
@@ -46,9 +53,6 @@ semver's own rule for pre-1.0 releases.
   system Region setting (`Calendar.current`'s `firstWeekday`), which could
   disagree with the day Claude Code's own `/usage` panel reports for the
   same account. Reported as "custo semanal com data errada".
-- Token usage reads each transcript in 1MB chunks instead of loading the
-  whole file into memory at once, so one huge session file no longer
-  spikes Owl's memory ([#51](https://github.com/luanhssa/owl-notch/issues/51)).
 
 ## [0.18.0] - 2026-08-18
 
